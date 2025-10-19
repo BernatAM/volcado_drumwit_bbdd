@@ -32,6 +32,48 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# --- imports nuevos ---
+from typing import Literal
+from fastapi import BackgroundTasks, HTTPException
+import logging
+
+# Si volcado_clientes.py está en la raíz del repo:
+from volcado_clientes import (
+    pipeline_incremental_horario,
+    pipeline_upsert_nocturno,
+    run_query,
+)
+
+logger = logging.getLogger("etl")
+
+def _run_etl(mode: Literal["incremental", "nocturno"]) -> None:
+    """Ejecuta el ETL en el mismo proceso."""
+    try:
+        if mode == "incremental":
+            logger.info("ETL: iniciando incremental")
+            pipeline_incremental_horario(run_query)
+            logger.info("ETL: incremental finalizado OK")
+        elif mode == "nocturno":
+            logger.info("ETL: iniciando nocturno")
+            pipeline_upsert_nocturno(run_query)
+            logger.info("ETL: nocturno finalizado OK")
+        else:
+            raise ValueError(f"Modo ETL desconocido: {mode}")
+    except Exception:
+        logger.exception("ETL: error ejecutando modo=%s", mode)
+        # aquí podrías notificar/registrar a donde quieras
+        raise
+
+
+
+from pydantic import BaseModel
+
+class EtlRequest(BaseModel):
+    mode: Literal["incremental", "nocturno"] = "incremental"
+
+
+
+
 
 # -----------------------------
 # Configuración vía variables de entorno
@@ -233,6 +275,20 @@ async def log_requests(request: Request, call_next):
                 ensure_ascii=False,
             )
         )
+
+
+@app.post("/api/v1/etl", summary="Dispara el ETL (incremental o nocturno)")
+async def trigger_etl(payload: EtlRequest, background: BackgroundTasks):
+    mode = payload.mode
+    try:
+        # Lanza en background para no bloquear la respuesta HTTP
+        background.add_task(_run_etl, mode)
+        return {"status": "accepted", "mode": mode}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception:
+        logger.exception("Fallo al encolar el ETL")
+        raise HTTPException(status_code=500, detail="No se pudo lanzar el ETL")
 
 
 # -----------------------------
