@@ -4,6 +4,8 @@ import re
 import sys
 import logging
 from datetime import datetime, timedelta, date, time
+from datetime import datetime as _dt
+from datetime import timedelta as _td
 
 from dotenv import load_dotenv
 import pymysql  # pip install pymysql
@@ -118,8 +120,6 @@ def clean_datetime_mysql(v) -> str | None:
         return None
     return s.replace("T", " ")
 
-from datetime import timedelta as _td
-
 def clean_time_mysql(v) -> str | None:
     """
     Convierte TIME de MySQL a 'HH:MM:SS'.
@@ -148,8 +148,6 @@ def clean_time_mysql(v) -> str | None:
     return None
 
 # ---- Validación de fecha_vuelta >= fecha_ida (u omitirla) ----
-from datetime import datetime as _dt
-
 def _safe_set_fecha_vuelta(row: dict, fecha_ida_str: str | None, fecha_vuelta_raw) -> None:
     """
     Añade 'fecha_vuelta' sólo si:
@@ -169,6 +167,15 @@ def _safe_set_fecha_vuelta(row: dict, fecha_ida_str: str | None, fecha_vuelta_ra
         except Exception:
             return
     row["fecha_vuelta"] = fecha_vuelta_str
+
+
+def clean_id_reserva_compradora(v):
+    """Devuelve int > 0 o None (MySQL usa 0 como 'sin compradora')."""
+    try:
+        n = int(v) if v is not None else 0
+        return n if n > 0 else None
+    except Exception:
+        return None
 
 # ------------------------
 # Carga clientes de Supabase (telefono->cliente_id)
@@ -199,7 +206,7 @@ def load_cliente_map() -> dict:
     return telefono_to_cliente
 
 # ------------------------
-# Queries MySQL
+# Queries MySQL (con telefono_eff y nombre_eff)
 # ------------------------
 SQL_RESERVA_BASE = """
 SELECT
@@ -208,28 +215,36 @@ SELECT
     r.fecha_reserva,
     r.fecha_salida,
     r.fecha_llegada,
-    r.telefono,
-    r.idioma
+    -- Teléfono efectivo: principal o comprador_regalo si el principal está vacío
+    COALESCE(NULLIF(r.telefono, ''), NULLIF(r.telefono_comprador_regalo, '')) AS telefono_eff,
+    -- Nombre efectivo (por si luego lo necesitas)
+    COALESCE(NULLIF(r.nombre_regalo, ''), NULLIF(r.nombre_comprador_regalo, ''), NULLIF(r.nickname, '')) AS nombre_eff,
+    r.idioma,
+    r.regalo,
+    r.id_reserva_compradora_regalo
 FROM reserva r
-WHERE r.estado = 1 AND {where_clause}
+WHERE r.estado > 0 AND {where_clause}
 """
 
 SQL_BOOKING_ENRICH = """
 SELECT
     r.id AS reserva_id,
     COALESCE(NULLIF(r.localizador,''), CAST(r.id AS CHAR)) AS id_reserva,
-    r.fecha_reserva,              -- añadido
-    r.fecha_salida,               -- ya estaba
-    r.fecha_llegada,              -- ya estaba
-    r.telefono,
+    r.fecha_reserva,   -- blindaje NOT NULL en enriquecimiento
+    r.fecha_salida,
+    r.fecha_llegada,
+    COALESCE(NULLIF(r.telefono, ''), NULLIF(r.telefono_comprador_regalo, '')) AS telefono_eff,
+    COALESCE(NULLIF(r.nombre_regalo, ''), NULLIF(r.nombre_comprador_regalo, ''), NULLIF(r.nickname, '')) AS nombre_eff,
     r.idioma,
+    r.regalo,
+    r.id_reserva_compradora_regalo,
     bf.departure_time AS hora_ida,
     bf.return_time    AS hora_vuelta,
     d.nombre_es       AS destino_nombre
 FROM reserva r
 JOIN booking_flights bf ON bf.booking_id = r.id
 LEFT JOIN destino d ON d.id = bf.destination_id
-WHERE r.estado = 1 AND {where_clause}
+WHERE r.estado > 0 AND {where_clause}
 """
 
 def build_where(mode: str) -> str:
@@ -249,12 +264,13 @@ def reservas_base_rows(mysql_rows, telefono_map):
     """
     - fecha_ida (NOT NULL): si inválida -> descartar fila
     - fecha_vuelta/fecha_reserva: opcionales; si inválidas -> omitir campo
+    - regalo (0/1) y compradora (nullable)
     """
     out = []
     skipped_no_cliente = 0
     skipped_bad_fecha_ida = 0
     for r in mysql_rows:
-        tel_norm = normalize_phone(r["telefono"])
+        tel_norm = normalize_phone(r["telefono_eff"])
         cliente_id = telefono_map.get(tel_norm)
         if not cliente_id:
             skipped_no_cliente += 1
@@ -270,6 +286,7 @@ def reservas_base_rows(mysql_rows, telefono_map):
             "id_reserva": r["id_reserva"],
             "destino": "Pendiente",
             "fecha_ida": fecha_ida,
+            "regalo": r.get("regalo"),
         }
 
         _safe_set_fecha_vuelta(row, fecha_ida, r.get("fecha_llegada"))
@@ -277,6 +294,10 @@ def reservas_base_rows(mysql_rows, telefono_map):
         fecha_reserva = clean_datetime_mysql(r.get("fecha_reserva"))
         if fecha_reserva:
             row["fecha_reserva"] = fecha_reserva
+
+        compradora = clean_id_reserva_compradora(r.get("id_reserva_compradora_regalo"))
+        if compradora is not None:
+            row["id_reserva_compradora_regalo"] = compradora
 
         out.append(row)
 
@@ -291,6 +312,7 @@ def reservas_enrichment_rows(mysql_rows, telefono_map, reservas_base_index):
     Devuelve filas para ACTUALIZAR destino y horas de vuelo.
     Si por cualquier motivo la fila base no existiera y el upsert hiciera INSERT,
     aquí enviamos también las columnas NOT NULL (fecha_reserva, fecha_ida) para no romper.
+    Además, incluimos regalo y compradora para mantener consistencia.
     """
     out = []
     missing_base = 0
@@ -308,6 +330,7 @@ def reservas_enrichment_rows(mysql_rows, telefono_map, reservas_base_index):
             "cliente_id": cliente_id,
             "id_reserva": id_reserva,
             "destino": (r.get("destino_nombre") or "Pendiente"),
+            "regalo": r.get("regalo"),
         }
 
         # Horas (normalizadas a HH:MM:SS)
@@ -318,19 +341,14 @@ def reservas_enrichment_rows(mysql_rows, telefono_map, reservas_base_index):
         if hora_vuelta:
             row["hora_vuelo_vuelta"] = hora_vuelta
 
-        # --- Blindaje NOT NULL en caso de INSERT por upsert ---
-        # fecha_ida (obligatoria)
+        # Blindaje NOT NULL si el upsert entra por INSERT
         fecha_ida = clean_date_mysql(r.get("fecha_salida"))
         if fecha_ida:
             row["fecha_ida"] = fecha_ida
         else:
-            # si no tenemos fecha_ida válida, mejor no arriesgar un INSERT
-            # (si la base existe, UPDATE no la necesita; si no existe, evitaríamos un 23502)
-            # Aun así, para máxima robustez, saltamos esta fila.
             log.debug("Saltando enriquecimiento por fecha_ida inválida en reserva_id=%s", reserva_id)
             continue
 
-        # fecha_reserva (obligatoria). Si no viene, usamos NOW() UTC.
         fr = clean_datetime_mysql(r.get("fecha_reserva"))
         if fr:
             row["fecha_reserva"] = fr
@@ -338,8 +356,11 @@ def reservas_enrichment_rows(mysql_rows, telefono_map, reservas_base_index):
             row["fecha_reserva"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
             fallback_fr += 1
 
-        # fecha_vuelta opcional pero consistente con el CHECK
         _safe_set_fecha_vuelta(row, fecha_ida, r.get("fecha_llegada"))
+
+        compradora = clean_id_reserva_compradora(r.get("id_reserva_compradora_regalo"))
+        if compradora is not None:
+            row["id_reserva_compradora_regalo"] = compradora
 
         out.append(row)
 
@@ -349,7 +370,6 @@ def reservas_enrichment_rows(mysql_rows, telefono_map, reservas_base_index):
         log.info("reservas_enrichment_rows: fecha_reserva con fallback NOW() en %d filas", fallback_fr)
 
     return out
-
 
 # ------------------------
 # Upserts a Supabase (cliente_reservas)
@@ -381,7 +401,7 @@ def pipeline_incremental():
         reservas_base_idx = {}
         base_rows_sb = []
         for r in base_rows_mysql:
-            tel_norm = normalize_phone(r["telefono"])
+            tel_norm = normalize_phone(r["telefono_eff"])
             cliente_id = tel_map.get(tel_norm)
             if not cliente_id:
                 continue
@@ -390,6 +410,7 @@ def pipeline_incremental():
                 "cliente_id": cliente_id,
                 "id_reserva": r["id_reserva"],
                 "destino": "Pendiente",
+                "regalo": r.get("regalo"),
             }
 
             fecha_ida = clean_date_mysql(r.get("fecha_salida"))
@@ -403,7 +424,10 @@ def pipeline_incremental():
             if fecha_reserva:
                 row["fecha_reserva"] = fecha_reserva
 
-            # Indexar SOLO si insertaremos esta fila base
+            compradora = clean_id_reserva_compradora(r.get("id_reserva_compradora_regalo"))
+            if compradora is not None:
+                row["id_reserva_compradora_regalo"] = compradora
+
             base_rows_sb.append(row)
             reservas_base_idx[r["reserva_id"]] = (cliente_id, r["id_reserva"])
 
@@ -433,7 +457,7 @@ def pipeline_nocturno():
         reservas_base_idx = {}
         base_rows_sb = []
         for r in base_rows_mysql:
-            tel_norm = normalize_phone(r["telefono"])
+            tel_norm = normalize_phone(r["telefono_eff"])
             cliente_id = tel_map.get(tel_norm)
             if not cliente_id:
                 continue
@@ -442,11 +466,10 @@ def pipeline_nocturno():
                 "cliente_id": cliente_id,
                 "id_reserva": r["id_reserva"],
                 "destino": "Pendiente",
+                "regalo": r.get("regalo"),
             }
 
             fecha_ida = clean_date_mysql(r.get("fecha_salida"))
-            if not fecha_ida:
-                continue
             row["fecha_ida"] = fecha_ida
 
             _safe_set_fecha_vuelta(row, fecha_ida, r.get("fecha_llegada"))
@@ -454,6 +477,10 @@ def pipeline_nocturno():
             fecha_reserva = clean_datetime_mysql(r.get("fecha_reserva"))
             if fecha_reserva:
                 row["fecha_reserva"] = fecha_reserva
+
+            compradora = clean_id_reserva_compradora(r.get("id_reserva_compradora_regalo"))
+            if compradora is not None:
+                row["id_reserva_compradora_regalo"] = compradora
 
             base_rows_sb.append(row)
             reservas_base_idx[r["reserva_id"]] = (cliente_id, r["id_reserva"])
@@ -476,7 +503,7 @@ def pipeline_nocturno():
 # ------------------------
 if __name__ == "__main__":
     log.info("Iniciando ETL reservas | ETL_MODE=%s", ETL_MODE)
-    ETL_MODE = "incremental"
+    ETL_MODE = 'nocturno'
     try:
         if ETL_MODE == "incremental":
             pipeline_incremental()

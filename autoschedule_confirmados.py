@@ -30,12 +30,18 @@ PRODUCTION_CUTOFF_MAD = datetime(2025, 10, 22, 10, 0, 0, tzinfo=MAD)
 CONFIRMAR_NORMAL = ["confirmar_mail_confirmacion", "confirmar_mail_confirmacion_1"]
 CONFIRMAR_REPETIDOR = ["confirmar_mail_confirmacion_repetidor", "confirmar_mail_confirmacion_repetidor_1"]
 
+CANJEO_CANDS = ["canjeo_bono_1", "canjeo_bono"]
+
+# Regalo: si es repetidor por teléfono usamos el específico, si no una de las dos normales
+REGALO_NORMAL = ["tarjeta_regalo", "tarjeta_regalo_1"]
+REGALO_REPETIDOR = "tarjeta_regalo_repetidor"
+
 # ----------------- Modelos -----------------
 
 @dataclass
 class OPCItem:
     flow_id: str
-    flow_type: Optional[str]    # 'confirmados' | 'como_ha_ido' | 'vuestra_aventura' | None
+    flow_type: Optional[str]    # 'confirmados' | 'canjeo' | 'regalo_confirmado' | 'como_ha_ido' | 'vuestra_aventura' | None
     reserva_id: Optional[str]   # TEXT (cliente_reservas.id_reserva); None si flow sin reserva
     cliente_id: int
     json_variables: str
@@ -50,11 +56,10 @@ class OPCItem:
 def parse_to_madrid(value: Any) -> datetime:
     """
     Convierte 'value' a datetime aware en Europe/Madrid.
-    Reglas:
-      - Si es str y NO tiene tz (naive) -> interpretar como hora de Madrid.
-      - Si es str con tz (Z, +01:00, etc.) -> convertir a Madrid.
-      - Si es datetime naive -> asumir que está en hora de Madrid.
-      - Si es datetime aware -> convertir a Madrid.
+    - str sin tz -> hora Madrid
+    - str con tz -> convertir a Madrid
+    - datetime naive -> hora Madrid
+    - datetime aware -> convertir a Madrid
     """
     if isinstance(value, datetime):
         if value.tzinfo is None:
@@ -63,7 +68,6 @@ def parse_to_madrid(value: Any) -> datetime:
 
     if isinstance(value, str):
         v = value.strip()
-        # fromisoformat admite 'YYYY-MM-DDTHH:MM:SS[.ffffff][+HH:MM]' o con 'Z' si la sustituimos
         if v.endswith("Z"):
             v = v[:-1] + "+00:00"
         dt = datetime.fromisoformat(v)
@@ -77,7 +81,8 @@ def compute_send_datetime_madrid(created_mad: datetime) -> datetime:
     """
     Reglas:
       - Si hora de creación en [07:30, 20:30] -> send = creación + 30 min
-      - Si fuera -> siguiente 08:MM (mismo día si <07:30; día siguiente si >20:30)
+      - Si fuera -> siguiente 09:MM (mismo día si <07:30; día siguiente si >20:30)
+      (cambia 9 por 8 si prefieres 08:MM)
     """
     start = created_mad.replace(hour=7, minute=30, second=0, microsecond=0)
     end   = created_mad.replace(hour=20, minute=30, second=0, microsecond=0)
@@ -87,10 +92,10 @@ def compute_send_datetime_madrid(created_mad: datetime) -> datetime:
 
     minutes = created_mad.minute
     if created_mad.time() < start.time():
-        base = created_mad.replace(hour=8, minute=0, second=0, microsecond=0)
+        base = created_mad.replace(hour=9, minute=0, second=0, microsecond=0)
     else:
         next_day = (created_mad + timedelta(days=1)).date()
-        base = datetime(next_day.year, next_day.month, next_day.day, 8, 0, 0, tzinfo=MAD)
+        base = datetime(next_day.year, next_day.month, next_day.day, 9, 0, 0, tzinfo=MAD)
 
     return base.replace(minute=minutes)
 
@@ -111,15 +116,14 @@ def djb2_hash(s: str) -> int:
 def fetch_reservas_since(since_utc: datetime) -> List[Dict[str, Any]]:
     """
     Lee cliente_reservas con fecha_reserva >= since_utc (timestamptz).
-    Campos usados: id_reserva (TEXT), cliente_id (INT), fecha_reserva (timestamptz o timestamp sin tz).
+    Campos usados:
+      id_reserva (TEXT), cliente_id (INT), fecha_reserva (ts/tstz),
+      regalo (int/bool), id_reserva_compradora_regalo (TEXT|null)
     """
-    # Si la columna es timestamptz, comparar en UTC es correcto.
-    # Si por algún motivo fuera timestamp sin tz (local Madrid),
-    # este filtro podría excluir/incluir bordes; puedes subir la ventana si te preocupa.
     since_iso = since_utc.astimezone(timezone.utc).isoformat()
     r = (
         supabase.table("cliente_reservas")
-        .select("id_reserva, cliente_id, fecha_reserva")
+        .select("id_reserva, cliente_id, fecha_reserva, regalo, id_reserva_compradora_regalo")  # <-- CAMBIO
         .gte("fecha_reserva", since_iso)
         .order("fecha_reserva", desc=False)
         .execute()
@@ -130,11 +134,8 @@ def fetch_cliente(cliente_id: int) -> Dict[str, Any]:
     r = supabase.table("clientes").select("*").eq("cliente_id", cliente_id).single().execute()
     return r.data or {}
 
-def cliente_tiene_reservas_previas(cliente_id: int, created_mad: datetime, excluir_id_reserva: str) -> bool:
-    """
-    ¿El cliente tiene alguna reserva anterior a 'created_mad' (hora Madrid) distinta de 'excluir_id_reserva'?
-    Convertimos a UTC para comparar si la columna es timestamptz.
-    """
+def cliente_tiene_reservas_previas_por_cliente(cliente_id: int, created_mad: datetime, excluir_id_reserva: str) -> bool:
+    """Histórico por cliente (para confirmados normales)."""
     antes_iso = created_mad.astimezone(timezone.utc).isoformat()
     r = (
         supabase.table("cliente_reservas")
@@ -145,8 +146,30 @@ def cliente_tiene_reservas_previas(cliente_id: int, created_mad: datetime, exclu
         .limit(1)
         .execute()
     )
-    rows = r.data or []
-    return len(rows) > 0
+    return bool(r.data)
+
+def cliente_tiene_reservas_previas_por_telefono(telefono: str, created_mad: datetime, excluir_id_reserva: str) -> bool:
+    """
+    Histórico por teléfono (para regalos). Si varios clientes comparten ese teléfono,
+    cuenta reservas de cualquiera de ellos.
+    """
+    if not telefono:
+        return False
+    cl = (supabase.table("clientes").select("cliente_id").eq("telefono", telefono).execute())
+    ids = [int(x["cliente_id"]) for x in (cl.data or []) if "cliente_id" in x]
+    if not ids:
+        return False
+    antes_iso = created_mad.astimezone(timezone.utc).isoformat()
+    r = (
+        supabase.table("cliente_reservas")
+        .select("id_reserva, cliente_id")
+        .in_("cliente_id", ids)
+        .lt("fecha_reserva", antes_iso)
+        .neq("id_reserva", excluir_id_reserva)
+        .limit(1)
+        .execute()
+    )
+    return bool(r.data)
 
 def upsert_opc_items(items: List[OPCItem]) -> int:
     """
@@ -186,24 +209,15 @@ def upsert_opc_items(items: List[OPCItem]) -> int:
 
     return total
 
-# ----------------- Construcción de "confirmados" -----------------
+# ----------------- Builders por tipo -----------------
 
-def build_confirmados_item_for_reserva(row: Dict[str, Any]) -> Optional[OPCItem]:
-    """
-    Construye 1 fila de 'confirmados' para una reserva:
-      - Interpreta fecha_reserva como hora de Madrid si llega naive
-      - Calcula send_datetime con regla Madrid
-      - Respeta corte de producción
-      - flow_id repetidor/normal en base a histórico del cliente
-    """
+def build_item_confirmados(row: Dict[str, Any]) -> Optional[OPCItem]:
+    """Confirmados (no regalo y sin id_reserva_compradora_regalo)."""
     id_reserva = str(row["id_reserva"])
     cliente_id = int(row["cliente_id"])
-
-    # AHORA: parseamos directamente a Madrid (naive => Madrid; aware => convertido a Madrid)
     created_mad = parse_to_madrid(row["fecha_reserva"])
     send_mad = compute_send_datetime_madrid(created_mad)
 
-    # Respetar el corte de producción
     if send_mad < PRODUCTION_CUTOFF_MAD:
         return None
 
@@ -211,35 +225,123 @@ def build_confirmados_item_for_reserva(row: Dict[str, Any]) -> Optional[OPCItem]
     nombre = (cliente.get("nombre") or "").strip()
     idioma = (cliente.get("idioma") or cliente.get("lang") or "es")
 
-    # ¿repetidor? (comparamos en UTC para mayor compatibilidad con timestamptz)
-    es_repetidor = cliente_tiene_reservas_previas(cliente_id, created_mad, excluir_id_reserva=id_reserva)
+    es_repetidor = cliente_tiene_reservas_previas_por_cliente(cliente_id, created_mad, excluir_id_reserva=id_reserva)
     candidatos = CONFIRMAR_REPETIDOR if es_repetidor else CONFIRMAR_NORMAL
 
-    # Elección determinista en base a id_reserva (texto)
-    h = djb2_hash(id_reserva)
-    flow_id = candidatos[h % len(candidatos)]
-
+    flow_id = candidatos[djb2_hash(id_reserva) % len(candidatos)]
     json_vars = json.dumps({"nombre": nombre}, ensure_ascii=False)
 
     return OPCItem(
         flow_id=flow_id,
         flow_type="confirmados",
-        reserva_id=id_reserva,             # TEXT
+        reserva_id=id_reserva,
         cliente_id=cliente_id,
         json_variables=json_vars,
-        send_datetime=iso_naive(send_mad), # naive, hora Madrid
+        send_datetime=iso_naive(send_mad),
         is_send=False,
         is_canceled=False,
         idioma=idioma,
         lang=idioma,
     )
 
+def build_item_canjeo(row: Dict[str, Any]) -> Optional[OPCItem]:
+    """Canjeo (si id_reserva_compradora_regalo no es nulo)."""
+    id_reserva = str(row["id_reserva"])
+    cliente_id = int(row["cliente_id"])
+    created_mad = parse_to_madrid(row["fecha_reserva"])
+    send_mad = compute_send_datetime_madrid(created_mad)
+
+    if send_mad < PRODUCTION_CUTOFF_MAD:
+        return None
+
+    cliente = fetch_cliente(cliente_id)
+    nombre = (cliente.get("nombre") or "").strip()
+    idioma = (cliente.get("idioma") or cliente.get("lang") or "es")
+
+    flow_id = CANJEO_CANDS[djb2_hash(id_reserva) % len(CANJEO_CANDS)]
+    json_vars = json.dumps({"nombre": nombre}, ensure_ascii=False)
+
+    return OPCItem(
+        flow_id=flow_id,
+        flow_type="canjeo",
+        reserva_id=id_reserva,
+        cliente_id=cliente_id,
+        json_variables=json_vars,
+        send_datetime=iso_naive(send_mad),
+        is_send=False,
+        is_canceled=False,
+        idioma=idioma,
+        lang=idioma,
+    )
+
+def build_item_regalo(row: Dict[str, Any]) -> Optional[OPCItem]:
+    """Regalo (si regalo = 1). Repetidor por teléfono."""
+    id_reserva = str(row["id_reserva"])
+    cliente_id = int(row["cliente_id"])
+    created_mad = parse_to_madrid(row["fecha_reserva"])
+    send_mad = compute_send_datetime_madrid(created_mad)
+
+    if send_mad < PRODUCTION_CUTOFF_MAD:
+        return None
+
+    cliente = fetch_cliente(cliente_id)
+    nombre = (cliente.get("nombre") or "").strip()
+    idioma = (cliente.get("idioma") or cliente.get("lang") or "es")
+    telefono = (cliente.get("telefono") or cliente.get("phone") or "").strip()
+
+    es_repetidor = cliente_tiene_reservas_previas_por_telefono(telefono, created_mad, excluir_id_reserva=id_reserva)
+
+    if es_repetidor and REGALO_REPETIDOR:
+        flow_id = REGALO_REPETIDOR
+    else:
+        flow_id = REGALO_NORMAL[djb2_hash(id_reserva) % len(REGALO_NORMAL)]
+
+    json_vars = json.dumps({"nombre": nombre}, ensure_ascii=False)
+
+    return OPCItem(
+        flow_id=flow_id,
+        flow_type="regalo_confirmado",
+        reserva_id=id_reserva,
+        cliente_id=cliente_id,
+        json_variables=json_vars,
+        send_datetime=iso_naive(send_mad),
+        is_send=False,
+        is_canceled=False,
+        idioma=idioma,
+        lang=idioma,
+    )
+
+# ----------------- Selector de tipo -----------------
+
+def build_item_for_reserva(row: Dict[str, Any]) -> Optional[OPCItem]:
+    """
+    Decide qué tipo toca:
+      - regalo_confirmado  -> si regalo == 1
+      - canjeo             -> si id_reserva_compradora_regalo no es nulo
+      - confirmados        -> resto (regalo == 0 y compradora nulo)
+    """
+    regalo_flag = row.get("regalo")
+    try:
+        is_regalo = bool(int(regalo_flag)) if isinstance(regalo_flag, (str, int)) else bool(regalo_flag)
+    except Exception:
+        is_regalo = bool(regalo_flag)
+
+    # <-- CAMBIO de nombre de campo:
+    id_reserva_compradora_regalo = row.get("id_reserva_compradora_regalo")
+
+    if is_regalo:
+        return build_item_regalo(row)
+    if id_reserva_compradora_regalo not in (None, "", "null"):
+        return build_item_canjeo(row)
+    return build_item_confirmados(row)
+
 # ----------------- Runner incremental -----------------
 
 def run_incremental_confirmados(window_hours: int = 24) -> int:
     """
     Ejecuta una ventana deslizante (p.ej. 24h) sobre cliente_reservas.fecha_reserva.
-    Idempotente gracias a las UNIQUE constraints.
+    Crea según casuística: confirmados / canjeo / regalo_confirmado.
+    Idempotente por UNIQUE (flow_type,reserva_id).
     """
     now_utc = datetime.now(timezone.utc)
     since_utc = now_utc - timedelta(hours=max(1, window_hours))
@@ -248,7 +350,7 @@ def run_incremental_confirmados(window_hours: int = 24) -> int:
 
     items: List[OPCItem] = []
     for r in reservas:
-        it = build_confirmados_item_for_reserva(r)
+        it = build_item_for_reserva(r)
         if it:
             items.append(it)
 
