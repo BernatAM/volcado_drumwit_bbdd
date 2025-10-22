@@ -452,7 +452,7 @@ def pipeline_upsert_nocturno(run_query_func) -> None:
 # ============================================================
 if __name__ == "__main__":
     mode = os.getenv("ETL_MODE", "nocturno").lower()  # "incremental" o "nocturno"
-    ETL_MODE = "nocturno"
+    ETL_MODE = "incremental"
     if mode == "incremental":
         pipeline_incremental_horario(run_query)
     elif mode == "nocturno":

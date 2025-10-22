@@ -244,7 +244,7 @@ SELECT
 FROM reserva r
 JOIN booking_flights bf ON bf.booking_id = r.id
 LEFT JOIN destino d ON d.id = bf.destination_id
-WHERE r.estado > 0 AND {where_clause}
+WHERE r.estado > 0 AND localizador = 'F1O27FRK' AND {where_clause}
 """
 
 def build_where(mode: str) -> str:
@@ -414,8 +414,7 @@ def pipeline_incremental():
             }
 
             fecha_ida = clean_date_mysql(r.get("fecha_salida"))
-            if not fecha_ida:
-                continue
+
             row["fecha_ida"] = fecha_ida
 
             _safe_set_fecha_vuelta(row, fecha_ida, r.get("fecha_llegada"))
@@ -503,7 +502,7 @@ def pipeline_nocturno():
 # ------------------------
 if __name__ == "__main__":
     log.info("Iniciando ETL reservas | ETL_MODE=%s", ETL_MODE)
-    ETL_MODE = 'nocturno'
+    ETL_MODE = 'incremental'
     try:
         if ETL_MODE == "incremental":
             pipeline_incremental()

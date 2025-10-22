@@ -24,7 +24,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 MAD = ZoneInfo("Europe/Madrid")
 # Corte de producción: solo crear envíos con send_datetime Madrid >= este momento
-PRODUCTION_CUTOFF_MAD = datetime(2025, 10, 22, 10, 0, 0, tzinfo=MAD)
+PRODUCTION_CUTOFF_MAD = datetime(2025, 10, 23, 8, 0, 0, tzinfo=MAD)
 
 # Candidatos de flow_id
 CONFIRMAR_NORMAL = ["confirmar_mail_confirmacion", "confirmar_mail_confirmacion_1"]
