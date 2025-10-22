@@ -323,19 +323,18 @@ from autoschedule_viajes import (plan_como_ha_ido_para_dia,           # def plan
 
 MAD = ZoneInfo("Europe/Madrid")
 
-# ========= MODELOS DE ENTRADA =========
+# ======= MODELOS =======
 class ModeRequest(BaseModel):
     mode: Literal["incremental", "nocturno"]
 
 class DayRequest(BaseModel):
-    target_day: str = Field(..., description="Formato YYYY-MM-DD")
+    target_day: str = Field(..., description="YYYY-MM-DD")
 
     @field_validator("target_day")
     @classmethod
-    def _validate_date(cls, v: str) -> str:
-        # Validación sencilla de formato YYYY-MM-DD
+    def _val_date(cls, v: str) -> str:
+        from datetime import date
         try:
-            from datetime import date
             y, m, d = (int(x) for x in v.split("-"))
             date(y, m, d)
         except Exception:
@@ -343,115 +342,82 @@ class DayRequest(BaseModel):
         return v
 
 
-# ========= WRAPPERS SENCILLOS =========
-def _run_clientes(mode: Literal["incremental", "nocturno"]) -> None:
+# ======= ENDPOINTS SINCRÓNICOS =======
+
+# 1) CLIENTES (mode)
+@app.post("/api/v1/etl/clientes", summary="ETL clientes (incremental | nocturno)")
+def etl_clientes(payload: ModeRequest):
     try:
-        if mode == "incremental":
+        if payload.mode == "incremental":
             logger.info("ETL clientes incremental: INICIO")
             clientes_incremental(run_query)
         else:
             logger.info("ETL clientes nocturno: INICIO")
             clientes_nocturno(run_query)
-        logger.info("ETL clientes: OK (%s)", mode)
-    except Exception:
-        logger.exception("ETL clientes: fallo (%s)", mode)
-        raise
+        logger.info("ETL clientes: OK (%s)", payload.mode)
+        return {"ok": True, "group": "clientes", "mode": payload.mode}
+    except Exception as e:
+        logger.exception("ETL clientes: fallo (%s)", payload.mode)
+        raise HTTPException(status_code=500, detail=str(e))
 
-def _run_reservas(mode: Literal["incremental", "nocturno"]) -> None:
+# 2) RESERVAS (mode)
+@app.post("/api/v1/etl/reservas", summary="ETL reservas (incremental | nocturno)")
+def etl_reservas(payload: ModeRequest):
     if reservas_incremental is None or reservas_nocturno is None:
-        raise RuntimeError("Reservas: pipelines no importados. Revisa los imports.")
+        raise HTTPException(status_code=500, detail="Pipelines de reservas no importados")
     try:
-        if mode == "incremental":
+        if payload.mode == "incremental":
             logger.info("ETL reservas incremental: INICIO")
             reservas_incremental()
         else:
             logger.info("ETL reservas nocturno: INICIO")
             reservas_nocturno()
-        logger.info("ETL reservas: OK (%s)", mode)
-    except Exception:
-        logger.exception("ETL reservas: fallo (%s)", mode)
-        raise
+        logger.info("ETL reservas: OK (%s)", payload.mode)
+        return {"ok": True, "group": "reservas", "mode": payload.mode}
+    except Exception as e:
+        logger.exception("ETL reservas: fallo (%s)", payload.mode)
+        raise HTTPException(status_code=500, detail=str(e))
 
-def _run_confirmados() -> None:
+# 3) CONFIRMADOS (sin body, sin parámetros)
+@app.post("/api/v1/autoschedule/confirmados", summary="Autoschedule confirmados (horario)")
+def autoschedule_confirmados():
     if run_incremental_confirmados is None:
-        raise RuntimeError("run_incremental_confirmados no importado. Revisa el módulo autoschedule.")
+        raise HTTPException(status_code=500, detail="run_incremental_confirmados no importado")
     try:
-        logger.info("Autoschedule confirmados (horario): INICIO")
-        # Sin argumentos: usará su ventana y lógica por defecto
+        logger.info("Autoschedule confirmados: INICIO")
         run_incremental_confirmados()
-        logger.info("Autoschedule confirmados (horario): OK")
-    except Exception:
-        logger.exception("Autoschedule confirmados (horario): fallo")
-        raise
-
-def _run_como_ha_ido(target_day: str) -> None:
-    if plan_como_ha_ido_para_dia is None:
-        raise RuntimeError("plan_como_ha_ido_para_dia no importado. Revisa el módulo autoschedule.")
-    try:
-        logger.info("Autoschedule como_ha_ido: INICIO (day=%s)", target_day)
-        plan_como_ha_ido_para_dia(target_day)
-        logger.info("Autoschedule como_ha_ido: OK (day=%s)", target_day)
-    except Exception:
-        logger.exception("Autoschedule como_ha_ido: fallo (day=%s)", target_day)
-        raise
-
-def _run_vuestra_aventura(target_day: str) -> None:
-    if plan_vuestra_aventura_para_dia is None:
-        raise RuntimeError("plan_vuestra_aventura_para_dia no importado. Revisa el módulo autoschedule.")
-    try:
-        logger.info("Autoschedule vuestra_aventura: INICIO (day=%s)", target_day)
-        plan_vuestra_aventura_para_dia(target_day)
-        logger.info("Autoschedule vuestra_aventura: OK (day=%s)", target_day)
-    except Exception:
-        logger.exception("Autoschedule vuestra_aventura: fallo (day=%s)", target_day)
-        raise
-
-
-# ========= ENDPOINTS, UNO POR GRUPO =========
-
-# 1) CLIENTES
-@app.post("/api/v1/etl/clientes", summary="ETL clientes (mode: incremental | nocturno)")
-async def etl_clientes(payload: ModeRequest, background: BackgroundTasks):
-    try:
-        background.add_task(_run_clientes, payload.mode)
-        return {"status": "accepted", "group": "clientes", "mode": payload.mode}
+        logger.info("Autoschedule confirmados: OK")
+        return {"ok": True, "group": "confirmados"}
     except Exception as e:
+        logger.exception("Autoschedule confirmados: fallo")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 2) RESERVAS
-@app.post("/api/v1/etl/reservas", summary="ETL reservas (mode: incremental | nocturno)")
-async def etl_reservas(payload: ModeRequest, background: BackgroundTasks):
-    try:
-        background.add_task(_run_reservas, payload.mode)
-        return {"status": "accepted", "group": "reservas", "mode": payload.mode}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# 3) CONFIRMADOS
-@app.post("/api/v1/autoschedule/confirmados", summary="Autoschedule confirmados (horario, sin parámetros)")
-async def autoschedule_confirmados(background: BackgroundTasks):
-    try:
-        background.add_task(_run_confirmados)
-        return {"status": "accepted", "group": "confirmados"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# 4) COMO_HA_IDO (solo fecha)
+# 4) COMO_HA_IDO (target_day)
 @app.post("/api/v1/autoschedule/como_ha_ido", summary="Autoschedule 'como_ha_ido' para un día (YYYY-MM-DD)")
-async def autoschedule_como_ha_ido(payload: DayRequest, background: BackgroundTasks):
+def autoschedule_como_ha_ido(payload: DayRequest):
+    if plan_como_ha_ido_para_dia is None:
+        raise HTTPException(status_code=500, detail="plan_como_ha_ido_para_dia no importado")
     try:
-        background.add_task(_run_como_ha_ido, payload.target_day)
-        return {"status": "accepted", "group": "como_ha_ido", "target_day": payload.target_day}
+        logger.info("Autoschedule como_ha_ido: INICIO (day=%s)", payload.target_day)
+        plan_como_ha_ido_para_dia(payload.target_day)
+        logger.info("Autoschedule como_ha_ido: OK (day=%s)", payload.target_day)
+        return {"ok": True, "group": "como_ha_ido", "target_day": payload.target_day}
     except Exception as e:
+        logger.exception("Autoschedule como_ha_ido: fallo (day=%s)", payload.target_day)
         raise HTTPException(status_code=500, detail=str(e))
 
-# 5) VUESTRA_AVENTURA (solo fecha)
+# 5) VUESTRA_AVENTURA (target_day)
 @app.post("/api/v1/autoschedule/vuestra_aventura", summary="Autoschedule 'vuestra_aventura' para un día (YYYY-MM-DD)")
-async def autoschedule_vuestra_aventura(payload: DayRequest, background: BackgroundTasks):
+def autoschedule_vuestra_aventura(payload: DayRequest):
+    if plan_vuestra_aventura_para_dia is None:
+        raise HTTPException(status_code=500, detail="plan_vuestra_aventura_para_dia no importado")
     try:
-        background.add_task(_run_vuestra_aventura, payload.target_day)
-        return {"status": "accepted", "group": "vuestra_aventura", "target_day": payload.target_day}
+        logger.info("Autoschedule vuestra_aventura: INICIO (day=%s)", payload.target_day)
+        plan_vuestra_aventura_para_dia(payload.target_day)
+        logger.info("Autoschedule vuestra_aventura: OK (day=%s)", payload.target_day)
+        return {"ok": True, "group": "vuestra_aventura", "target_day": payload.target_day}
     except Exception as e:
+        logger.exception("Autoschedule vuestra_aventura: fallo (day=%s)", payload.target_day)
         raise HTTPException(status_code=500, detail=str(e))
 
 
