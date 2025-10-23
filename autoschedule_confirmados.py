@@ -97,6 +97,17 @@ def djb2_hash(s: str) -> int:
         h &= 0xFFFFFFFF
     return h
 
+def pick_nickname(cli: Dict[str, Any]) -> str:
+    """
+    Devuelve el mejor nickname disponible, con fallback al nombre.
+    Prioridad: nickname > nick > alias > nombre.
+    """
+    for key in ("nickname", "nick", "alias"):
+        val = (cli.get(key) or "").strip()
+        if val:
+            return val
+    return (cli.get("nombre") or "").strip()
+
 # ----------------- Acceso a Supabase -----------------
 
 def fetch_reservas_since(since_utc: datetime) -> List[Dict[str, Any]]:
@@ -117,6 +128,7 @@ def fetch_reservas_since(since_utc: datetime) -> List[Dict[str, Any]]:
     return r.data or []
 
 def fetch_cliente(cliente_id: int) -> Dict[str, Any]:
+    # Traemos todas las columnas por simplicidad (nickname puede tener nombres distintos)
     r = supabase.table("clientes").select("*").eq("cliente_id", cliente_id).single().execute()
     return r.data or {}
 
@@ -216,14 +228,14 @@ def build_item_confirmados(row: Dict[str, Any]) -> Optional[OPCItem]:
         return None
 
     cliente = fetch_cliente(cliente_id)
-    nombre = (cliente.get("nombre") or "").strip()
+    nickname = pick_nickname(cliente)
     idioma = (cliente.get("idioma") or cliente.get("lang") or "es")
 
     es_repetidor = cliente_tiene_reservas_previas_por_cliente(cliente_id, created_mad, excluir_id_reserva=id_reserva)
     candidatos = CONFIRMAR_REPETIDOR if es_repetidor else CONFIRMAR_NORMAL
 
     flow_id = candidatos[djb2_hash(id_reserva) % len(candidatos)]
-    json_vars = json.dumps({"nombre": nombre}, ensure_ascii=False)
+    json_vars = json.dumps({"nombre": nickname}, ensure_ascii=False)
 
     return OPCItem(
         flow_id=flow_id,
@@ -248,11 +260,11 @@ def build_item_canjeo(row: Dict[str, Any]) -> Optional[OPCItem]:
         return None
 
     cliente = fetch_cliente(cliente_id)
-    nombre = (cliente.get("nombre") or "").strip()
+    nickname = pick_nickname(cliente)
     idioma = (cliente.get("idioma") or cliente.get("lang") or "es")
 
     flow_id = CANJEO_CANDS[djb2_hash(id_reserva) % len(CANJEO_CANDS)]
-    json_vars = json.dumps({"nombre": nombre}, ensure_ascii=False)
+    json_vars = json.dumps({"nombre": nickname}, ensure_ascii=False)
 
     return OPCItem(
         flow_id=flow_id,
@@ -277,7 +289,7 @@ def build_item_regalo(row: Dict[str, Any]) -> Optional[OPCItem]:
         return None
 
     cliente = fetch_cliente(cliente_id)
-    nombre = (cliente.get("nombre") or "").strip()
+    nickname = pick_nickname(cliente)
     idioma = (cliente.get("idioma") or cliente.get("lang") or "es")
     telefono = (cliente.get("telefono") or cliente.get("phone") or "").strip()
 
@@ -288,7 +300,7 @@ def build_item_regalo(row: Dict[str, Any]) -> Optional[OPCItem]:
     else:
         flow_id = REGALO_NORMAL[djb2_hash(id_reserva) % len(REGALO_NORMAL)]
 
-    json_vars = json.dumps({"nombre": nombre}, ensure_ascii=False)
+    json_vars = json.dumps({"nombre": nickname}, ensure_ascii=False)
 
     return OPCItem(
         flow_id=flow_id,

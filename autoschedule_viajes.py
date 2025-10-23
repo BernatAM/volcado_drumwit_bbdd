@@ -5,8 +5,8 @@ import os
 import json
 import argparse
 from dataclasses import dataclass, asdict
-from datetime import datetime, date, time, timedelta, timezone
-from typing import Optional, Dict, Any, List, Union
+from datetime import datetime, date, time, timedelta
+from typing import Optional, Dict, Any, List, Union, Tuple, Set
 
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
@@ -66,7 +66,6 @@ def to_date(value: Any) -> Optional[date]:
     if isinstance(value, datetime):
         return value.date()
     if isinstance(value, str):
-        # Maneja 'YYYY-MM-DD' (ISO)
         return datetime.strptime(value[:10], "%Y-%m-%d").date()
     return None
 
@@ -80,7 +79,6 @@ def to_time(value: Any) -> Optional[time]:
         return value.time().replace(microsecond=0)
     if isinstance(value, str):
         s = value.strip()
-        # Quita fracción si viene 'HH:MM:SS.mmm'
         if "." in s:
             s = s.split(".", 1)[0]
         parts = s.split(":")
@@ -104,6 +102,25 @@ def ensure_date(d: Union[str, date]) -> date:
     if isinstance(d, date):
         return d
     return datetime.strptime(d, "%Y-%m-%d").date()
+
+def _chunked(seq, size):
+    for i in range(0, len(seq), size):
+        yield seq[i:i+size]
+
+def _parse_day_naive(dt_str: str) -> str:
+    # 'YYYY-MM-DD HH:MM:SS' -> 'YYYY-MM-DD'
+    return dt_str.split(" ", 1)[0]
+
+def pick_nickname(cli: Dict[str, Any]) -> str:
+    """
+    Devuelve el mejor nickname disponible, con fallback al nombre.
+    Prioridad: nickname > nick > alias > apodo > nombre.
+    """
+    for key in ("nickname", "nick", "alias", "apodo"):
+        val = (cli.get(key) or "").strip()
+        if val:
+            return val
+    return (cli.get("nombre") or "").strip()
 
 # ----------------- DB helpers -----------------
 
@@ -141,29 +158,108 @@ def fetch_reservas_vuelta_para_fecha(d: date) -> List[Dict[str, Any]]:
          .execute())
     return r.data or []
 
-def existe_como_ha_ido(reserva_id: str) -> bool:
-    """¿Ya existe un como_ha_ido para esa id_reserva en opcionesinicio_client?"""
-    r = (supabase.table("opcionesinicio_client")
-         .select("reserva_id", count="exact")
-         .eq("flow_type", "como_ha_ido")
-         .eq("reserva_id", reserva_id)
-         .limit(1)
-         .execute())
-    if getattr(r, "count", None) is not None:
-        return r.count > 0
-    return bool(r.data)
+# Reemplaza tu helper por este
+def fetch_existing_como_ha_ido_for(reserva_ids: List[str], chunk: int = 100) -> set[str]:
+    """
+    Devuelve el set de reserva_id que YA tienen flow_type='como_ha_ido'.
+    Lee en lotes pequeños (IN de 100) para evitar timeouts en entornos sin tuning.
+    Requiere (recomendado) índice: idx_opciclient_flowtype_reservaid.
+    """
+    if not reserva_ids:
+        return set()
+
+    uniq = [str(r) for r in {r for r in reserva_ids if r}]
+    existing: set[str] = set()
+
+    for i in range(0, len(uniq), chunk):
+        rids = uniq[i:i+chunk]
+        # En algunos hosts, timeouts se reducen si acotamos columnas y evitamos count exacto
+        resp = (
+            supabase.table("opcionesinicio_client")
+            .select("reserva_id")               # solo lo necesario
+            .eq("flow_type", "como_ha_ido")
+            .in_("reserva_id", rids)
+            .execute()
+        )
+        for row in (resp.data or []):
+            rid = row.get("reserva_id")
+            if rid:
+                existing.add(str(rid))
+
+    return existing
+
+
+
+def _fetch_existing_reservas_por_tipo_y_dia(flow_type: str, day_str: str, page_size: int = 1000) -> Set[str]:
+    """
+    Lee reserva_id existentes para un flow_type y día concreto (rango send_datetime [day, next_day)).
+    Paginado por 'id' para no sobrecargar.
+    """
+    start_of_day = f"{day_str} 00:00:00"
+    next_day = (datetime.strptime(day_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    start = 0
+    existentes: Set[str] = set()
+
+    while True:
+        resp = (
+            supabase.table("opcionesinicio_client")
+            .select("id,reserva_id")
+            .eq("flow_type", flow_type)
+            .gte("send_datetime", start_of_day)
+            .lt("send_datetime", f"{next_day} 00:00:00")
+            .order("id", desc=False)
+            .range(start, start + page_size - 1)
+            .execute()
+        )
+        rows = resp.data or []
+        if not rows:
+            break
+        for r in rows:
+            rid = r.get("reserva_id")
+            if rid:
+                existentes.add(str(rid))
+        if len(rows) < page_size:
+            break
+        start += page_size
+
+    return existentes
 
 def upsert_reservas(items: List[OPCItem]) -> int:
-    """Upsert idempotente por (flow_type, reserva_id)."""
+    """
+    Inserta SOLO si no existe ya (flow_type, reserva_id), sin ON CONFLICT.
+    Agrupa por (flow_type, día de send_datetime) y filtra contra existentes en ese rango.
+    """
     if not items:
         return 0
-    payload = [asdict(x) for x in items]
-    supabase.table("opcionesinicio_client").upsert(
-        payload,
-        on_conflict="flow_type,reserva_id",
-        returning="minimal",
-    ).execute()
-    return len(payload)
+
+    # 1) Agrupar por (flow_type, day)
+    grupos: Dict[Tuple[str, str], List[OPCItem]] = {}
+    for it in items:
+        if not it.reserva_id:
+            continue
+        day = _parse_day_naive(it.send_datetime)
+        grupos.setdefault((it.flow_type, day), []).append(it)
+
+    if not grupos:
+        return 0
+
+    # 2) Cargar existentes por grupo y filtrar
+    to_insert: List[dict] = []
+    for (ft, day), group_items in grupos.items():
+        existentes = _fetch_existing_reservas_por_tipo_y_dia(ft, day)
+        for it in group_items:
+            if it.reserva_id not in existentes:
+                to_insert.append(asdict(it))
+
+    if not to_insert:
+        return 0
+
+    # 3) Insertar en chunks
+    inserted = 0
+    for chunk in _chunked(to_insert, 300):
+        supabase.table("opcionesinicio_client").insert(chunk, returning="minimal").execute()
+        inserted += len(chunk)
+    return inserted
 
 # ----------------- Reglas de envío -----------------
 
@@ -189,12 +285,12 @@ def send_dt_vuestra_aventura_para_dia(target_day: date) -> datetime:
 # ----------------- BUILDERS -----------------
 
 def build_item_como_ha_ido(row: Dict[str, Any], cliente: Dict[str, Any], send_dt_mad: datetime) -> OPCItem:
-    nombre = (cliente.get("nombre") or "").strip()
+    nickname = pick_nickname(cliente)
     idioma = (cliente.get("idioma") or cliente.get("lang") or "es")
     id_reserva = str(row["id_reserva"])
     destino = row.get("destino")
     flow_id = COMO_HA_IDO_CANDS[djb2_hash(id_reserva) % len(COMO_HA_IDO_CANDS)]
-    json_vars = json.dumps({"nombre": nombre, "ciudad": destino}, ensure_ascii=False)
+    json_vars = json.dumps({"nombre": nickname, "ciudad": destino}, ensure_ascii=False)
     return OPCItem(
         flow_id=flow_id,
         flow_type="como_ha_ido",
@@ -209,11 +305,11 @@ def build_item_como_ha_ido(row: Dict[str, Any], cliente: Dict[str, Any], send_dt
     )
 
 def build_item_vuestra_aventura(row: Dict[str, Any], cliente: Dict[str, Any], send_dt_mad: datetime) -> OPCItem:
-    nombre = (cliente.get("nombre") or "").strip()
+    nickname = pick_nickname(cliente)
     idioma = (cliente.get("idioma") or cliente.get("lang") or "es")
     id_reserva = str(row["id_reserva"])
     flow_id = VUESTRA_AVENTURA_CANDS[djb2_hash(id_reserva) % len(VUESTRA_AVENTURA_CANDS)]
-    json_vars = json.dumps({"nombre": nombre}, ensure_ascii=False)
+    json_vars = json.dumps({"nombre": nickname}, ensure_ascii=False)
     return OPCItem(
         flow_id=flow_id,
         flow_type="vuestra_aventura",
@@ -262,32 +358,44 @@ def plan_como_ha_ido_para_dia(target_day: Union[str, date]) -> int:
         return 0
 
     inserted = upsert_reservas(items)
-    print(f"[como_ha_ido] day={target_day} candidatos={len(items)} upsertados={inserted}")
+    print(f"[como_ha_ido] day={target_day} candidatos={len(items)} insertados={inserted}")
     return inserted
 
 def plan_vuestra_aventura_para_dia(target_day: Union[str, date], require_como_ha_ido: bool = True) -> int:
     """
     Genera TODOS los 'vuestra_aventura' cuyo envío es 'target_day' a las 09:00 (Madrid):
       - Considera vueltas en 'target_day - 1'.
-      - Envía target_day 09:00.
+      - Envía en 'target_day' 09:00.
       - Si 'require_como_ha_ido' es True, SOLO crea si ya existe 'como_ha_ido' para esa id_reserva.
+    Optimizada: comprobación de existencia en lote para evitar timeouts.
     """
     target_day = ensure_date(target_day)
     ayer = target_day - timedelta(days=1)
 
+    # 1) Traer vueltas del día anterior
     rows = fetch_reservas_vuelta_para_fecha(ayer)
     if not rows:
         print(f"[vuestra_aventura] No hay vueltas en {ayer}.")
         return 0
 
+    # 2) Cache de clientes
     cliente_ids = list({int(r["cliente_id"]) for r in rows})
     cache_clientes = fetch_clientes(cliente_ids)
 
+    # 3) Hora de envío fija 09:00 del día objetivo
     send_dt = send_dt_vuestra_aventura_para_dia(target_day)
+
+    # 4) Precargar en bloque las reservas que YA tienen 'como_ha_ido'
+    existing_como: set[str] = set()
+    if require_como_ha_ido:
+        all_rids = [str(r["id_reserva"]) for r in rows]
+        existing_como = fetch_existing_como_ha_ido_for(all_rids)
+
+    # 5) Construir items filtrando por existencia (si se requiere)
     items: List[OPCItem] = []
     for r in rows:
         rid = str(r["id_reserva"])
-        if require_como_ha_ido and not existe_como_ha_ido(rid):
+        if require_como_ha_ido and rid not in existing_como:
             continue
         cl = cache_clientes.get(int(r["cliente_id"]), {})
         items.append(build_item_vuestra_aventura(r, cl, send_dt))
@@ -296,9 +404,11 @@ def plan_vuestra_aventura_para_dia(target_day: Union[str, date], require_como_ha
         print(f"[vuestra_aventura] No hay envíos para {target_day} (tras filtro como_ha_ido={require_como_ha_ido}).")
         return 0
 
+    # 6) Insertar solo los que no existen (tu upsert_reservas ya hace insert-if-not-exists)
     inserted = upsert_reservas(items)
-    print(f"[vuestra_aventura] day={target_day} candidatos={len(items)} upsertados={inserted}")
+    print(f"[vuestra_aventura] day={target_day} candidatos={len(items)} insertados={inserted}")
     return inserted
+
 
 # ----------------- CLI -----------------
 
@@ -322,4 +432,3 @@ if __name__ == "__main__":
     target_day = "2025-10-23"
     plan_como_ha_ido_para_dia(target_day)
     plan_vuestra_aventura_para_dia(target_day, require_como_ha_ido=True)
-
