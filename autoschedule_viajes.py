@@ -319,7 +319,7 @@ def main():
         plan_vuestra_aventura_para_dia(target_day, require_como_ha_ido=not args.no_require_como)
 
 if __name__ == "__main__":
-    target_day = "2025-10-22"
+    target_day = "2025-10-23"
     plan_como_ha_ido_para_dia(target_day)
     plan_vuestra_aventura_para_dia(target_day, require_como_ha_ido=True)
 

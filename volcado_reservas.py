@@ -244,7 +244,7 @@ SELECT
 FROM reserva r
 JOIN booking_flights bf ON bf.booking_id = r.id
 LEFT JOIN destino d ON d.id = bf.destination_id
-WHERE r.estado > 0 AND localizador = 'F1O27FRK' AND {where_clause}
+WHERE r.estado > 0 AND {where_clause}
 """
 
 def build_where(mode: str) -> str:
@@ -502,7 +502,7 @@ def pipeline_nocturno():
 # ------------------------
 if __name__ == "__main__":
     log.info("Iniciando ETL reservas | ETL_MODE=%s", ETL_MODE)
-    ETL_MODE = 'incremental'
+    ETL_MODE = 'nocturno'
     try:
         if ETL_MODE == "incremental":
             pipeline_incremental()
