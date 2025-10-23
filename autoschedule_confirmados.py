@@ -5,11 +5,12 @@ import os
 import json
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Set
 
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from postgrest.exceptions import APIError  # para capturar duplicados 23505
 
 # ----------------- Configuración -----------------
 
@@ -54,13 +55,6 @@ class OPCItem:
 # ----------------- Utilidades -----------------
 
 def parse_to_madrid(value: Any) -> datetime:
-    """
-    Convierte 'value' a datetime aware en Europe/Madrid.
-    - str sin tz -> hora Madrid
-    - str con tz -> convertir a Madrid
-    - datetime naive -> hora Madrid
-    - datetime aware -> convertir a Madrid
-    """
     if isinstance(value, datetime):
         if value.tzinfo is None:
             return value.replace(tzinfo=MAD)
@@ -78,12 +72,6 @@ def parse_to_madrid(value: Any) -> datetime:
     raise ValueError(f"No puedo parsear fecha_reserva: {value!r}")
 
 def compute_send_datetime_madrid(created_mad: datetime) -> datetime:
-    """
-    Reglas:
-      - Si hora de creación en [07:30, 20:30] -> send = creación + 30 min
-      - Si fuera -> siguiente 09:MM (mismo día si <07:30; día siguiente si >20:30)
-      (cambia 9 por 8 si prefieres 08:MM)
-    """
     start = created_mad.replace(hour=7, minute=30, second=0, microsecond=0)
     end   = created_mad.replace(hour=20, minute=30, second=0, microsecond=0)
 
@@ -100,14 +88,12 @@ def compute_send_datetime_madrid(created_mad: datetime) -> datetime:
     return base.replace(minute=minutes)
 
 def iso_naive(dt_aware: datetime) -> str:
-    """Devuelve 'YYYY-MM-DD HH:MM:SS' sin tz."""
     return dt_aware.replace(tzinfo=None).isoformat(sep=" ", timespec="seconds")
 
 def djb2_hash(s: str) -> int:
-    """Hash determinista simple para elegir variantes de flow_id a partir de id_reserva TEXT."""
     h = 5381
     for ch in s:
-        h = ((h << 5) + h) + ord(ch)  # h*33 + ch
+        h = ((h << 5) + h) + ord(ch)
         h &= 0xFFFFFFFF
     return h
 
@@ -123,7 +109,7 @@ def fetch_reservas_since(since_utc: datetime) -> List[Dict[str, Any]]:
     since_iso = since_utc.astimezone(timezone.utc).isoformat()
     r = (
         supabase.table("cliente_reservas")
-        .select("id_reserva, cliente_id, fecha_reserva, regalo, id_reserva_compradora_regalo")  # <-- CAMBIO
+        .select("id_reserva, cliente_id, fecha_reserva, regalo, id_reserva_compradora_regalo")
         .gte("fecha_reserva", since_iso)
         .order("fecha_reserva", desc=False)
         .execute()
@@ -135,7 +121,6 @@ def fetch_cliente(cliente_id: int) -> Dict[str, Any]:
     return r.data or {}
 
 def cliente_tiene_reservas_previas_por_cliente(cliente_id: int, created_mad: datetime, excluir_id_reserva: str) -> bool:
-    """Histórico por cliente (para confirmados normales)."""
     antes_iso = created_mad.astimezone(timezone.utc).isoformat()
     r = (
         supabase.table("cliente_reservas")
@@ -149,10 +134,6 @@ def cliente_tiene_reservas_previas_por_cliente(cliente_id: int, created_mad: dat
     return bool(r.data)
 
 def cliente_tiene_reservas_previas_por_telefono(telefono: str, created_mad: datetime, excluir_id_reserva: str) -> bool:
-    """
-    Histórico por teléfono (para regalos). Si varios clientes comparten ese teléfono,
-    cuenta reservas de cualquiera de ellos.
-    """
     if not telefono:
         return False
     cl = (supabase.table("clientes").select("cliente_id").eq("telefono", telefono).execute())
@@ -171,48 +152,61 @@ def cliente_tiene_reservas_previas_por_telefono(telefono: str, created_mad: date
     )
     return bool(r.data)
 
-def upsert_opc_items(items: List[OPCItem]) -> int:
+# ----------------- Existentes en opcionesinicio_client -----------------
+
+def fetch_all_existing_reserva_ids(page_size: int = 5000) -> Set[str]:
     """
-    Upsert idempotente separando:
-      A) con reserva → on_conflict(flow_type,reserva_id)
-      B) sin reserva → on_conflict(flow_id,cliente_id,lang,send_datetime)
+    Descarga TODAS las reserva_id actualmente presentes en opcionesinicio_client (paginado).
+    Se filtran None/'' en Python.
     """
-    if not items:
-        return 0
+    existing: Set[str] = set()
+    start = 0
+    while True:
+        # usamos 'id' para paginar con rango estable
+        resp = (
+            supabase.table("opcionesinicio_client")
+            .select("id,reserva_id")
+            .order("id", desc=False)
+            .range(start, start + page_size - 1)
+            .execute()
+        )
+        rows = resp.data or []
+        if not rows:
+            break
+        for row in rows:
+            rid = row.get("reserva_id")
+            if rid:
+                existing.add(str(rid))
+        if len(rows) < page_size:
+            break
+        start += page_size
+    return existing
 
-    with_reserva = [
-        asdict(x) for x in items
-        if x.reserva_id is not None and x.flow_type is not None
-    ]
-    sin_reserva = [
-        asdict(x) for x in items
-        if x.reserva_id is None
-    ]
+# ----------------- INSERT-ONLY -----------------
 
-    total = 0
-
-    if with_reserva:
-        supabase.table("opcionesinicio_client").upsert(
-            with_reserva,
-            on_conflict="flow_type,reserva_id",
-            returning="minimal",
-        ).execute()
-        total += len(with_reserva)
-
-    if sin_reserva:
-        supabase.table("opcionesinicio_client").upsert(
-            sin_reserva,
-            on_conflict="flow_id,cliente_id,lang,send_datetime",
-            returning="minimal",
-        ).execute()
-        total += len(sin_reserva)
-
-    return total
+def insert_items_individually(items: List[OPCItem]) -> int:
+    """
+    Inserta items de uno en uno (INSERT puro).
+    - Ignora conflictos UNIQUE (23505) sin romper el batch.
+    - Devuelve cuántos se insertaron realmente.
+    """
+    inserted = 0
+    for it in items:
+        payload = asdict(it)
+        try:
+            supabase.table("opcionesinicio_client").insert(payload, returning="minimal").execute()
+            inserted += 1
+        except APIError as e:
+            # Si es duplicado UNIQUE (23505), lo ignoramos; cualquier otro error se relanza.
+            code = (getattr(e, "code", None) or getattr(e, "args", [{}])[0].get("code"))
+            if code == "23505":
+                continue
+            raise
+    return inserted
 
 # ----------------- Builders por tipo -----------------
 
 def build_item_confirmados(row: Dict[str, Any]) -> Optional[OPCItem]:
-    """Confirmados (no regalo y sin id_reserva_compradora_regalo)."""
     id_reserva = str(row["id_reserva"])
     cliente_id = int(row["cliente_id"])
     created_mad = parse_to_madrid(row["fecha_reserva"])
@@ -245,7 +239,6 @@ def build_item_confirmados(row: Dict[str, Any]) -> Optional[OPCItem]:
     )
 
 def build_item_canjeo(row: Dict[str, Any]) -> Optional[OPCItem]:
-    """Canjeo (si id_reserva_compradora_regalo no es nulo)."""
     id_reserva = str(row["id_reserva"])
     cliente_id = int(row["cliente_id"])
     created_mad = parse_to_madrid(row["fecha_reserva"])
@@ -275,7 +268,6 @@ def build_item_canjeo(row: Dict[str, Any]) -> Optional[OPCItem]:
     )
 
 def build_item_regalo(row: Dict[str, Any]) -> Optional[OPCItem]:
-    """Regalo (si regalo = 1). Repetidor por teléfono."""
     id_reserva = str(row["id_reserva"])
     cliente_id = int(row["cliente_id"])
     created_mad = parse_to_madrid(row["fecha_reserva"])
@@ -315,10 +307,9 @@ def build_item_regalo(row: Dict[str, Any]) -> Optional[OPCItem]:
 
 def build_item_for_reserva(row: Dict[str, Any]) -> Optional[OPCItem]:
     """
-    Decide qué tipo toca:
-      - regalo_confirmado  -> si regalo == 1
-      - canjeo             -> si id_reserva_compradora_regalo no es nulo
-      - confirmados        -> resto (regalo == 0 y compradora nulo)
+    - regalo_confirmado  -> si regalo == 1
+    - canjeo             -> si id_reserva_compradora_regalo no es nulo
+    - confirmados        -> resto
     """
     regalo_flag = row.get("regalo")
     try:
@@ -326,7 +317,6 @@ def build_item_for_reserva(row: Dict[str, Any]) -> Optional[OPCItem]:
     except Exception:
         is_regalo = bool(regalo_flag)
 
-    # <-- CAMBIO de nombre de campo:
     id_reserva_compradora_regalo = row.get("id_reserva_compradora_regalo")
 
     if is_regalo:
@@ -339,27 +329,36 @@ def build_item_for_reserva(row: Dict[str, Any]) -> Optional[OPCItem]:
 
 def run_incremental_confirmados(window_hours: int = 24) -> int:
     """
-    Ejecuta una ventana deslizante (p.ej. 24h) sobre cliente_reservas.fecha_reserva.
-    Crea según casuística: confirmados / canjeo / regalo_confirmado.
-    Idempotente por UNIQUE (flow_type,reserva_id).
+    Regla:
+      - Si el item es 'confirmados' y su reserva_id YA existe en cualquier fila de opcionesinicio_client -> NO insertar.
+      - Para otros flow_type, se insertan sin mirar esa regla.
     """
     now_utc = datetime.now(timezone.utc)
     since_utc = now_utc - timedelta(hours=max(1, window_hours))
 
+    # 1) Cargar existentes (todas las reserva_id de opcionesinicio_client)
+    existing_reserva_ids = fetch_all_existing_reserva_ids()
+
+    # 2) Construir candidatos desde cliente_reservas en la ventana
     reservas = fetch_reservas_since(since_utc)
 
     items: List[OPCItem] = []
     for r in reservas:
         it = build_item_for_reserva(r)
-        if it:
-            items.append(it)
+        if not it:
+            continue
+        # Regla de filtrado: solo afecta a confirmados
+        if it.flow_type == "confirmados" and it.reserva_id in existing_reserva_ids:
+            continue
+        items.append(it)
 
-    inserted = upsert_opc_items(items)
-    print(f"[incremental] ventana={window_hours}h, candidatos={len(items)}, upsertados={inserted}")
+    # 3) Insertar SOLO nuevos (uno a uno, ignorando duplicados por UNIQUE si los hubiera)
+    inserted = insert_items_individually(items)
+
+    print(f"[incremental] ventana={window_hours}h, candidatos={len(items)}, insertados={inserted}")
     return inserted
 
 # ----------------- Main -----------------
 
 if __name__ == "__main__":
-    # Llama a este script cada 30 minutos (cron/Task Scheduler/systemd). Ajusta la ventana si quieres.
     run_incremental_confirmados(window_hours=24)
