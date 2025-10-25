@@ -25,7 +25,7 @@ MAD = ZoneInfo("Europe/Madrid")
 
 # flow_ids candidatos (deterministas)
 COMO_HA_IDO_CANDS = ["como_ha_ido_vuelo_hotel", "como_ha_ido_vuelo_hotel_2", "como_va_por_ciudad"]
-VUESTRA_AVENTURA_CANDS = ["vuestra_aventura", "vuestra_aventura_2"]
+VUESTRA_AVENTURA_CANDS = ["vuestra_aventura", "vuetra_aventura_2"]
 
 # ----------------- Modelos -----------------
 
@@ -280,7 +280,7 @@ def send_dt_como_ha_ido_por_hora_ida(ida_dt_mad: datetime) -> datetime:
 
 def send_dt_vuestra_aventura_para_dia(target_day: date) -> datetime:
     """Para VUESTRA AVENTURA: siempre target_day a las 09:00."""
-    return datetime(target_day.year, target_day.month, target_day.day, 9, 0, 0, tzinfo=MAD)
+    return datetime(target_day.year, target_day.month, target_day.day, 10, 0, 0, tzinfo=MAD)
 
 # ----------------- BUILDERS -----------------
 
@@ -429,6 +429,6 @@ def main():
         plan_vuestra_aventura_para_dia(target_day, require_como_ha_ido=not args.no_require_como)
 
 if __name__ == "__main__":
-    target_day = "2025-10-23"
-    plan_como_ha_ido_para_dia(target_day)
+    target_day = "2025-10-25"
+    #plan_como_ha_ido_para_dia(target_day)
     plan_vuestra_aventura_para_dia(target_day, require_como_ha_ido=True)
