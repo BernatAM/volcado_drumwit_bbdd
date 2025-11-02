@@ -5,7 +5,7 @@ import os
 import json
 import argparse
 from dataclasses import dataclass, asdict
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, date, time, timedelta, timezone
 from typing import Optional, Dict, Any, List, Union, Tuple, Set
 
 from zoneinfo import ZoneInfo
@@ -23,9 +23,13 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 MAD = ZoneInfo("Europe/Madrid")
 
-# flow_ids candidatos (deterministas)
-COMO_HA_IDO_CANDS = ["como_ha_ido_vuelo_hotel", "como_ha_ido_vuelo_hotel_2", "como_va_por_ciudad"]
-VUESTRA_AVENTURA_CANDS = ["vuestra_aventura", "vuetra_aventura_2"]
+# flow_ids fijos según reglas
+COMO_HA_IDO_NORMAL = "como_ha_ido_vuelo_hotel"
+COMO_HA_IDO_REPETIDOR = "como_va_por_ciudad"
+COMO_HA_IDO_NEXTDAY = "como_ha_ido_vuelo_hotel_2"
+
+VUESTRA_AVENTURA_NORMAL = "vuestra_aventura"
+VUESTRA_AVENTURA_REPETIDOR = "vuetra_aventura_2"  # (tal cual en tu BBDD)
 
 # ----------------- Modelos -----------------
 
@@ -145,7 +149,7 @@ def fetch_reservas_ida_para_fechas(dias: List[date]) -> List[Dict[str, Any]]:
         return []
     dias_str = [d.isoformat() for d in dias]
     r = (supabase.table("cliente_reservas")
-         .select("id_reserva, cliente_id, destino, fecha_ida, hora_vuelo_ida")
+         .select("id_reserva, cliente_id, destino, fecha_ida, hora_vuelo_ida, fecha_reserva")
          .in_("fecha_ida", dias_str)
          .execute())
     return r.data or []
@@ -153,17 +157,15 @@ def fetch_reservas_ida_para_fechas(dias: List[date]) -> List[Dict[str, Any]]:
 def fetch_reservas_vuelta_para_fecha(d: date) -> List[Dict[str, Any]]:
     """Trae reservas cuya fecha_vuelta == d."""
     r = (supabase.table("cliente_reservas")
-         .select("id_reserva, cliente_id, destino, fecha_vuelta")
+         .select("id_reserva, cliente_id, destino, fecha_vuelta, fecha_reserva")
          .eq("fecha_vuelta", d.isoformat())
          .execute())
     return r.data or []
 
-# Reemplaza tu helper por este
 def fetch_existing_como_ha_ido_for(reserva_ids: List[str], chunk: int = 100) -> set[str]:
     """
     Devuelve el set de reserva_id que YA tienen flow_type='como_ha_ido'.
-    Lee en lotes pequeños (IN de 100) para evitar timeouts en entornos sin tuning.
-    Requiere (recomendado) índice: idx_opciclient_flowtype_reservaid.
+    Lee en lotes pequeños (IN de 100).
     """
     if not reserva_ids:
         return set()
@@ -173,10 +175,9 @@ def fetch_existing_como_ha_ido_for(reserva_ids: List[str], chunk: int = 100) -> 
 
     for i in range(0, len(uniq), chunk):
         rids = uniq[i:i+chunk]
-        # En algunos hosts, timeouts se reducen si acotamos columnas y evitamos count exacto
         resp = (
             supabase.table("opcionesinicio_client")
-            .select("reserva_id")               # solo lo necesario
+            .select("reserva_id")
             .eq("flow_type", "como_ha_ido")
             .in_("reserva_id", rids)
             .execute()
@@ -187,8 +188,6 @@ def fetch_existing_como_ha_ido_for(reserva_ids: List[str], chunk: int = 100) -> 
                 existing.add(str(rid))
 
     return existing
-
-
 
 def _fetch_existing_reservas_por_tipo_y_dia(flow_type: str, day_str: str, page_size: int = 1000) -> Set[str]:
     """
@@ -232,7 +231,6 @@ def upsert_reservas(items: List[OPCItem]) -> int:
     if not items:
         return 0
 
-    # 1) Agrupar por (flow_type, day)
     grupos: Dict[Tuple[str, str], List[OPCItem]] = {}
     for it in items:
         if not it.reserva_id:
@@ -243,7 +241,6 @@ def upsert_reservas(items: List[OPCItem]) -> int:
     if not grupos:
         return 0
 
-    # 2) Cargar existentes por grupo y filtrar
     to_insert: List[dict] = []
     for (ft, day), group_items in grupos.items():
         existentes = _fetch_existing_reservas_por_tipo_y_dia(ft, day)
@@ -254,7 +251,6 @@ def upsert_reservas(items: List[OPCItem]) -> int:
     if not to_insert:
         return 0
 
-    # 3) Insertar en chunks
     inserted = 0
     for chunk in _chunked(to_insert, 300):
         supabase.table("opcionesinicio_client").insert(chunk, returning="minimal").execute()
@@ -279,17 +275,60 @@ def send_dt_como_ha_ido_por_hora_ida(ida_dt_mad: datetime) -> datetime:
     return datetime(nxt.year, nxt.month, nxt.day, 9, 30, 0, tzinfo=MAD)
 
 def send_dt_vuestra_aventura_para_dia(target_day: date) -> datetime:
-    """Para VUESTRA AVENTURA: siempre target_day a las 09:00."""
+    """Para VUESTRA AVENTURA: siempre target_day a las 10:00 (hora ya usada en tu script)."""
     return datetime(target_day.year, target_day.month, target_day.day, 10, 0, 0, tzinfo=MAD)
+
+# ----------------- Repetidores -----------------
+
+def _to_utc_iso(dt_mad: datetime) -> str:
+    return dt_mad.astimezone(timezone.utc).isoformat()
+
+def cliente_tiene_reservas_previas_por_cliente(cliente_id: int, ref_dt_mad: datetime, excluir_id_reserva: str) -> bool:
+    """
+    ¿El cliente tiene reservas anteriores a ref_dt_mad?
+    Usa cliente_reservas.fecha_reserva < ref_dt y excluye la actual.
+    """
+    antes_iso = _to_utc_iso(ref_dt_mad)
+    r = (
+        supabase.table("cliente_reservas")
+        .select("id_reserva")
+        .eq("cliente_id", cliente_id)
+        .lt("fecha_reserva", antes_iso)
+        .neq("id_reserva", excluir_id_reserva)
+        .limit(1)
+        .execute()
+    )
+    return bool(r.data)
+
+def cliente_tiene_reservas_previas_por_telefono(telefono: str, ref_dt_mad: datetime, excluir_id_reserva: str) -> bool:
+    """
+    Variante por teléfono (útil si hay duplicidad de cliente_id).
+    """
+    if not telefono:
+        return False
+    cl = (supabase.table("clientes").select("cliente_id").eq("telefono", telefono).execute())
+    ids = [int(x["cliente_id"]) for x in (cl.data or []) if "cliente_id" in x]
+    if not ids:
+        return False
+    antes_iso = _to_utc_iso(ref_dt_mad)
+    r = (
+        supabase.table("cliente_reservas")
+        .select("id_reserva, cliente_id")
+        .in_("cliente_id", ids)
+        .lt("fecha_reserva", antes_iso)
+        .neq("id_reserva", excluir_id_reserva)
+        .limit(1)
+        .execute()
+    )
+    return bool(r.data)
 
 # ----------------- BUILDERS -----------------
 
-def build_item_como_ha_ido(row: Dict[str, Any], cliente: Dict[str, Any], send_dt_mad: datetime) -> OPCItem:
+def build_item_como_ha_ido(row: Dict[str, Any], cliente: Dict[str, Any], send_dt_mad: datetime, flow_id: str) -> OPCItem:
     nickname = pick_nickname(cliente)
     idioma = (cliente.get("idioma") or cliente.get("lang") or "es")
     id_reserva = str(row["id_reserva"])
     destino = row.get("destino")
-    flow_id = COMO_HA_IDO_CANDS[djb2_hash(id_reserva) % len(COMO_HA_IDO_CANDS)]
     json_vars = json.dumps({"nombre": nickname, "ciudad": destino}, ensure_ascii=False)
     return OPCItem(
         flow_id=flow_id,
@@ -304,11 +343,10 @@ def build_item_como_ha_ido(row: Dict[str, Any], cliente: Dict[str, Any], send_dt
         lang=idioma,
     )
 
-def build_item_vuestra_aventura(row: Dict[str, Any], cliente: Dict[str, Any], send_dt_mad: datetime) -> OPCItem:
+def build_item_vuestra_aventura(row: Dict[str, Any], cliente: Dict[str, Any], send_dt_mad: datetime, flow_id: str) -> OPCItem:
     nickname = pick_nickname(cliente)
     idioma = (cliente.get("idioma") or cliente.get("lang") or "es")
     id_reserva = str(row["id_reserva"])
-    flow_id = VUESTRA_AVENTURA_CANDS[djb2_hash(id_reserva) % len(VUESTRA_AVENTURA_CANDS)]
     json_vars = json.dumps({"nombre": nickname}, ensure_ascii=False)
     return OPCItem(
         flow_id=flow_id,
@@ -330,6 +368,9 @@ def plan_como_ha_ido_para_dia(target_day: Union[str, date]) -> int:
     Genera TODOS los 'como_ha_ido' cuyo envío cae EXACTAMENTE en 'target_day' (Madrid).
       - Considera idas en 'target_day' (15:00 o 19:00 del mismo día según hora).
       - Considera idas en 'target_day - 1' con hora > 15:00 (envío: target_day a las 09:30).
+    Selección de plantilla:
+      - Si el envío es mismo día: normal vs repetidor.
+      - Si el envío es al día siguiente por hora tardía: usar como_ha_ido_vuelo_hotel_2.
     """
     target_day = ensure_date(target_day)
     ayer = target_day - timedelta(days=1)
@@ -349,9 +390,25 @@ def plan_como_ha_ido_para_dia(target_day: Union[str, date]) -> int:
             continue
         send_dt = send_dt_como_ha_ido_por_hora_ida(ida_dt)
         if send_dt.date() != target_day:
+            # Este envío no cae en el día objetivo
             continue
+
         cl = cache_clientes.get(int(r["cliente_id"]), {})
-        items.append(build_item_como_ha_ido(r, cl, send_dt))
+        rid = str(r["id_reserva"])
+
+        # ¿El envío es al día siguiente por vuelo tarde?
+        envio_next_day = (send_dt.date() != ida_dt.date())
+        if envio_next_day:
+            flow_id = COMO_HA_IDO_NEXTDAY
+        else:
+            # Mismo día → decidir por repetidor (prioridad por cliente; si quieres por teléfono, descomenta abajo)
+            es_repetidor = cliente_tiene_reservas_previas_por_cliente(int(r["cliente_id"]), ida_dt, excluir_id_reserva=rid)
+            # # Alternativa por teléfono:
+            # telefono = (cl.get("telefono") or cl.get("phone") or "").strip()
+            # es_repetidor = cliente_tiene_reservas_previas_por_telefono(telefono, ida_dt, excluir_id_reserva=rid)
+            flow_id = COMO_HA_IDO_REPETIDOR if es_repetidor else COMO_HA_IDO_NORMAL
+
+        items.append(build_item_como_ha_ido(r, cl, send_dt, flow_id))
 
     if not items:
         print(f"[como_ha_ido] No hay envíos para {target_day}.")
@@ -363,11 +420,13 @@ def plan_como_ha_ido_para_dia(target_day: Union[str, date]) -> int:
 
 def plan_vuestra_aventura_para_dia(target_day: Union[str, date], require_como_ha_ido: bool = True) -> int:
     """
-    Genera TODOS los 'vuestra_aventura' cuyo envío es 'target_day' a las 09:00 (Madrid):
+    Genera TODOS los 'vuestra_aventura' cuyo envío es 'target_day' a las 10:00 (Madrid):
       - Considera vueltas en 'target_day - 1'.
-      - Envía en 'target_day' 09:00.
+      - Envía en 'target_day' 10:00.
       - Si 'require_como_ha_ido' es True, SOLO crea si ya existe 'como_ha_ido' para esa id_reserva.
-    Optimizada: comprobación de existencia en lote para evitar timeouts.
+    Selección de plantilla:
+      - Repetidor → vuetra_aventura_2
+      - Normal → vuestra_aventura
     """
     target_day = ensure_date(target_day)
     ayer = target_day - timedelta(days=1)
@@ -382,7 +441,7 @@ def plan_vuestra_aventura_para_dia(target_day: Union[str, date], require_como_ha
     cliente_ids = list({int(r["cliente_id"]) for r in rows})
     cache_clientes = fetch_clientes(cliente_ids)
 
-    # 3) Hora de envío fija 09:00 del día objetivo
+    # 3) Hora de envío fija 10:00 del día objetivo
     send_dt = send_dt_vuestra_aventura_para_dia(target_day)
 
     # 4) Precargar en bloque las reservas que YA tienen 'como_ha_ido'
@@ -398,17 +457,23 @@ def plan_vuestra_aventura_para_dia(target_day: Union[str, date], require_como_ha
         if require_como_ha_ido and rid not in existing_como:
             continue
         cl = cache_clientes.get(int(r["cliente_id"]), {})
-        items.append(build_item_vuestra_aventura(r, cl, send_dt))
+
+        # Repetidor por cliente respecto al momento de envío (o usa ayer/fecha_reserva si prefieres)
+        es_repetidor = cliente_tiene_reservas_previas_por_cliente(int(r["cliente_id"]), send_dt, excluir_id_reserva=rid)
+        # # Alternativa por teléfono:
+        # telefono = (cl.get("telefono") or cl.get("phone") or "").strip()
+        # es_repetidor = cliente_tiene_reservas_previas_por_telefono(telefono, send_dt, excluir_id_reserva=rid)
+
+        flow_id = VUESTRA_AVENTURA_REPETIDOR if es_repetidor else VUESTRA_AVENTURA_NORMAL
+        items.append(build_item_vuestra_aventura(r, cl, send_dt, flow_id))
 
     if not items:
         print(f"[vuestra_aventura] No hay envíos para {target_day} (tras filtro como_ha_ido={require_como_ha_ido}).")
         return 0
 
-    # 6) Insertar solo los que no existen (tu upsert_reservas ya hace insert-if-not-exists)
     inserted = upsert_reservas(items)
     print(f"[vuestra_aventura] day={target_day} candidatos={len(items)} insertados={inserted}")
     return inserted
-
 
 # ----------------- CLI -----------------
 
@@ -429,6 +494,8 @@ def main():
         plan_vuestra_aventura_para_dia(target_day, require_como_ha_ido=not args.no_require_como)
 
 if __name__ == "__main__":
-    target_day = "2025-10-25"
-    #plan_como_ha_ido_para_dia(target_day)
+    # Ejemplos:
+    # main()
+    target_day = "2025-11-01"
+    plan_como_ha_ido_para_dia(target_day)
     plan_vuestra_aventura_para_dia(target_day, require_como_ha_ido=True)
