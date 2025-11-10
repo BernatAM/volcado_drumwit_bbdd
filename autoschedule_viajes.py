@@ -149,7 +149,7 @@ def fetch_reservas_ida_para_fechas(dias: List[date]) -> List[Dict[str, Any]]:
         return []
     dias_str = [d.isoformat() for d in dias]
     r = (supabase.table("cliente_reservas")
-         .select("id_reserva, cliente_id, destino, fecha_ida, hora_vuelo_ida, fecha_reserva")
+         .select("id_reserva, cliente_id, destino, fecha_ida, hora_vuelo_ida, fecha_reserva, numero_viajeros")
          .in_("fecha_ida", dias_str)
          .execute())
     return r.data or []
@@ -327,6 +327,8 @@ def cliente_tiene_reservas_previas_por_telefono(telefono: str, ref_dt_mad: datet
 def build_item_como_ha_ido(row: Dict[str, Any], cliente: Dict[str, Any], send_dt_mad: datetime, flow_id: str) -> OPCItem:
     nickname = pick_nickname(cliente)
     idioma = (cliente.get("idioma") or cliente.get("lang") or "es")
+    if idioma == 'pt':
+        idioma = 'pt_pt'
     id_reserva = str(row["id_reserva"])
     destino = row.get("destino")
     json_vars = json.dumps({"nombre": nickname, "ciudad": destino}, ensure_ascii=False)
@@ -346,6 +348,8 @@ def build_item_como_ha_ido(row: Dict[str, Any], cliente: Dict[str, Any], send_dt
 def build_item_vuestra_aventura(row: Dict[str, Any], cliente: Dict[str, Any], send_dt_mad: datetime, flow_id: str) -> OPCItem:
     nickname = pick_nickname(cliente)
     idioma = (cliente.get("idioma") or cliente.get("lang") or "es")
+    if idioma == 'pt':
+        idioma = 'pt_pt'
     id_reserva = str(row["id_reserva"])
     json_vars = json.dumps({"nombre": nickname}, ensure_ascii=False)
     return OPCItem(
@@ -408,6 +412,9 @@ def plan_como_ha_ido_para_dia(target_day: Union[str, date]) -> int:
             # es_repetidor = cliente_tiene_reservas_previas_por_telefono(telefono, ida_dt, excluir_id_reserva=rid)
             flow_id = COMO_HA_IDO_REPETIDOR if es_repetidor else COMO_HA_IDO_NORMAL
 
+        if r.get("numero_viajeros") == 1 and cl.get("idioma") == 'es':
+            flow_id = flow_id + "_singular"
+
         items.append(build_item_como_ha_ido(r, cl, send_dt, flow_id))
 
     if not items:
@@ -465,6 +472,8 @@ def plan_vuestra_aventura_para_dia(target_day: Union[str, date], require_como_ha
         # es_repetidor = cliente_tiene_reservas_previas_por_telefono(telefono, send_dt, excluir_id_reserva=rid)
 
         flow_id = VUESTRA_AVENTURA_REPETIDOR if es_repetidor else VUESTRA_AVENTURA_NORMAL
+        if r.get("numero_viajeros") == 1 and cl.get("idioma") == 'es':
+            flow_id = flow_id + "_singular"
         items.append(build_item_vuestra_aventura(r, cl, send_dt, flow_id))
 
     if not items:
@@ -496,6 +505,6 @@ def main():
 if __name__ == "__main__":
     # Ejemplos:
     # main()
-    target_day = "2025-11-01"
+    target_day = "2025-11-10"
     plan_como_ha_ido_para_dia(target_day)
     plan_vuestra_aventura_para_dia(target_day, require_como_ha_ido=True)

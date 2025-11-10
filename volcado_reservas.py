@@ -221,9 +221,11 @@ SELECT
     COALESCE(NULLIF(r.nombre_regalo, ''), NULLIF(r.nombre_comprador_regalo, ''), NULLIF(r.nickname, '')) AS nombre_eff,
     r.idioma,
     r.regalo,
-    r.id_reserva_compradora_regalo
+    r.id_reserva_compradora_regalo,
+    r.num_viajeros as numero_viajeros
 FROM reserva r
-WHERE r.estado > 0 AND {where_clause}
+WHERE 
+r.estado > 0 AND {where_clause}
 """
 
 SQL_BOOKING_ENRICH = """
@@ -244,18 +246,28 @@ SELECT
 FROM reserva r
 JOIN booking_flights bf ON bf.booking_id = r.id
 LEFT JOIN destino d ON d.id = bf.destination_id
-WHERE r.estado > 0 AND {where_clause}
+WHERE
+r.estado > 0 AND {where_clause}
 """
 
-def build_where(mode: str) -> str:
-    base = (f"(r.ultima_modificacion >= NOW() - INTERVAL {INCREMENTAL_HOURS} HOUR "
-            f"OR r.fecha_reserva >= NOW() - INTERVAL {INCREMENTAL_HOURS} HOUR)") \
-           if mode == "incremental" else \
-           "r.fecha_reserva >= CURDATE() - INTERVAL 365 DAY"
-    return (base
-            + " AND (r.fecha_salida IS NULL OR r.fecha_salida <> '0000-00-00')"
-            + " AND (r.fecha_llegada IS NULL OR r.fecha_llegada <> '0000-00-00')"
-            + " AND (r.fecha_llegada IS NULL OR r.fecha_llegada >= '1970-01-02')")
+def build_where(mode: str, hours: int = INCREMENTAL_HOURS) -> str:
+    # Filtros fijos (para evitar fechas mal formadas)
+    conds = [
+        "(r.fecha_salida IS NULL OR r.fecha_salida <> '0000-00-00')",
+        "(r.fecha_llegada IS NULL OR r.fecha_llegada <> '0000-00-00')",
+        "(r.fecha_llegada IS NULL OR r.fecha_llegada >= '1970-01-02')",
+    ]
+
+    # Filtro incremental (solo si toca)
+    if mode == "incremental":
+        conds.insert(
+            0,
+            f"(r.ultima_modificacion >= NOW() - INTERVAL {hours} HOUR "
+            f"OR r.fecha_reserva >= NOW() - INTERVAL {hours} HOUR)"
+        )
+
+    # En modo "full" no añadimos nada más: carga todo el histórico
+    return " AND ".join(conds)
 
 # ------------------------
 # Transformación a registros Supabase
@@ -411,6 +423,7 @@ def pipeline_incremental():
                 "id_reserva": r["id_reserva"],
                 "destino": "Pendiente",
                 "regalo": r.get("regalo"),
+                "numero_viajeros": r.get("numero_viajeros"),
             }
 
             fecha_ida = clean_date_mysql(r.get("fecha_salida"))
@@ -466,6 +479,7 @@ def pipeline_nocturno():
                 "id_reserva": r["id_reserva"],
                 "destino": "Pendiente",
                 "regalo": r.get("regalo"),
+                "numero_viajeros": r.get("numero_viajeros"),
             }
 
             fecha_ida = clean_date_mysql(r.get("fecha_salida"))

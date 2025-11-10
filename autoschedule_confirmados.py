@@ -120,7 +120,7 @@ def fetch_reservas_since(since_utc: datetime) -> List[Dict[str, Any]]:
     since_iso = since_utc.astimezone(timezone.utc).isoformat()
     r = (
         supabase.table("cliente_reservas")
-        .select("id_reserva, cliente_id, fecha_reserva, regalo, id_reserva_compradora_regalo")
+        .select("id_reserva, cliente_id, fecha_reserva, regalo, id_reserva_compradora_regalo, numero_viajeros")
         .gte("fecha_reserva", since_iso)
         .order("fecha_reserva", desc=False)
         .execute()
@@ -235,7 +235,12 @@ def build_item_confirmados(row: Dict[str, Any]) -> Optional[OPCItem]:
     candidatos = CONFIRMAR_REPETIDOR if es_repetidor else CONFIRMAR_NORMAL
 
     flow_id = candidatos[djb2_hash(id_reserva) % len(candidatos)]
+    if row.get("numero_viajeros") == 1:
+        flow_id = flow_id + "_singular"
     json_vars = json.dumps({"nombre": nickname}, ensure_ascii=False)
+
+    if idioma == 'pt':
+        idioma = 'pt_pt'
 
     return OPCItem(
         flow_id=flow_id,
@@ -264,6 +269,8 @@ def build_item_canjeo(row: Dict[str, Any]) -> Optional[OPCItem]:
     idioma = (cliente.get("idioma") or cliente.get("lang") or "es")
 
     flow_id = CANJEO_CANDS[djb2_hash(id_reserva) % len(CANJEO_CANDS)]
+    if row.get("numero_viajeros") == 1:
+        flow_id = flow_id + "_singular"
     json_vars = json.dumps({"nombre": nickname}, ensure_ascii=False)
 
     return OPCItem(
@@ -300,6 +307,8 @@ def build_item_regalo(row: Dict[str, Any]) -> Optional[OPCItem]:
     else:
         flow_id = REGALO_NORMAL[djb2_hash(id_reserva) % len(REGALO_NORMAL)]
 
+    if row.get("numero_viajeros") == 1 and idioma == 'es':
+        flow_id = flow_id + "_singular"
     json_vars = json.dumps({"nombre": nickname}, ensure_ascii=False)
 
     return OPCItem(
