@@ -157,7 +157,7 @@ def fetch_reservas_ida_para_fechas(dias: List[date]) -> List[Dict[str, Any]]:
 def fetch_reservas_vuelta_para_fecha(d: date) -> List[Dict[str, Any]]:
     """Trae reservas cuya fecha_vuelta == d."""
     r = (supabase.table("cliente_reservas")
-         .select("id_reserva, cliente_id, destino, fecha_vuelta, fecha_reserva")
+         .select("id_reserva, cliente_id, destino, fecha_vuelta, fecha_reserva, numero_viajeros")
          .eq("fecha_vuelta", d.isoformat())
          .execute())
     return r.data or []
@@ -505,6 +505,6 @@ def main():
 if __name__ == "__main__":
     # Ejemplos:
     # main()
-    target_day = "2025-11-10"
-    plan_como_ha_ido_para_dia(target_day)
+    target_day = "2025-11-11"
+    #plan_como_ha_ido_para_dia(target_day)
     plan_vuestra_aventura_para_dia(target_day, require_como_ha_ido=True)

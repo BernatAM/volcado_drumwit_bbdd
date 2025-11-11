@@ -42,28 +42,65 @@ from bbdd_conection import run_query
 # ============================================================
 # Utils
 # ============================================================
-def normalize_phone(raw: Any) -> Optional[str]:
+import re
+from typing import Any, Optional
+
+COUNTRY_PREFIX_BY_LANG = {
+    "es": "34",
+    "esp": "34",
+    "it": "39",
+    "fr": "33",
+    "pt": "351",
+    "en": "34"
+}
+
+def normalize_phone(raw: Any, lang: Optional[str] = None) -> Optional[str]:
     """
     Normaliza a dígitos (formato E.164 sin '+'):
     - elimina todo lo que no sea dígito
     - si empieza por '00' => lo quita
     - quita ceros domésticos iniciales
-    - si quedan 9 dígitos (móvil ES típico), antepone '34'
-    - si >15 dígitos => descarta
+    - si el resultado tiene 11 dígitos -> se devuelve tal cual
+    - si tiene menos de 11 y conocemos el idioma -> se antepone prefijo del país
+    - si >15 dígitos => descarta (None)
     """
     if raw is None:
         return None
+
     s = str(raw)
+    # dejar solo dígitos
     digits = re.sub(r"\D+", "", s)
     if not digits:
         return None
+
+    # quitar 00 inicial (formato internacional)
     if digits.startswith("00"):
         digits = digits[2:]
+
+    # quitar ceros domésticos iniciales
     digits = digits.lstrip("0")
-    if len(digits) == 9 and not digits.startswith("34"):
-        digits = "34" + digits
+
+    if not digits:
+        return None
+
+    # si ya tiene 11 dígitos, lo damos por bueno
+    if len(digits) == 11:
+        return digits
+
+    # si tiene menos de 11, añadimos prefijo según idioma
+    if len(digits) < 11:
+        prefix = None
+        if lang:
+            lang_key = str(lang).lower()
+            prefix = COUNTRY_PREFIX_BY_LANG.get(lang_key)
+
+        if prefix:
+            digits = prefix + digits
+
+    # si se ha ido de madre, descartamos
     if len(digits) > 15:
         return None
+
     return digits or None
 
 
@@ -96,9 +133,22 @@ def now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def df_dropna_phones(df: pd.DataFrame, phone_col: str) -> pd.DataFrame:
+def df_dropna_phones(
+    df: pd.DataFrame,
+    phone_col: str,
+    lang_col: Optional[str] = None,   # <- NUEVO
+) -> pd.DataFrame:
     df = df.copy()
-    df[phone_col] = df[phone_col].apply(normalize_phone)
+
+    # Usar lang si viene columna de idioma
+    if lang_col and lang_col in df.columns:
+        df[phone_col] = df.apply(
+            lambda row: normalize_phone(row[phone_col], row[lang_col]),
+            axis=1,
+        )
+    else:
+        df[phone_col] = df[phone_col].apply(normalize_phone)
+
     df = df[df[phone_col].notna()]
     df = df[df[phone_col].astype(str).str.fullmatch(r"\d{3,15}")]
     df = df.drop_duplicates(subset=[phone_col], keep="first")
@@ -240,13 +290,15 @@ def build_nombre_reserva_por_reserva(
     r = r.merge(first_adult, on="reserva_id", how="left")
 
     def pick_phone(row):
-        t = normalize_phone(row.get("telefono"))
-        return t if t else normalize_phone(row.get("telefono_comprador_regalo"))
+        lang = row.get("idioma")                    # <- usar idioma
+        t = normalize_phone(row.get("telefono"), lang)
+        return t if t else normalize_phone(row.get("telefono_comprador_regalo"), lang)
 
     # Devuelve: nombre_base, ap1, ap2, nickname_puro (CamelCase), nickname_display (case original si venía de reserva)
     def pick_parts(row):
-        telefono_normal = normalize_phone(row.get("telefono"))
-        is_gift = telefono_normal is None and normalize_phone(row.get("telefono_comprador_regalo")) is not None
+        lang = row.get("idioma")                    # <- usar idioma aquí también
+        telefono_normal = normalize_phone(row.get("telefono"), lang)
+        is_gift = telefono_normal is None and normalize_phone(row.get("telefono_comprador_regalo"), lang) is not None
 
         if is_gift:
             base_nombre  = _to_camel_case_name(row.get("nombre_comprador_regalo"))
@@ -403,7 +455,11 @@ def build_clientes_from_reservas(df_nombre_reserva: pd.DataFrame) -> pd.DataFram
     df = df_nombre_reserva.copy()
 
     # Teléfono y fecha
-    df["telefono"] = df["telefono_efectivo"].apply(normalize_phone)
+    # usar idioma por fila al normalizar
+    df["telefono"] = [
+        normalize_phone(tel, lang)                 # <- aquí usamos lang
+        for tel, lang in zip(df["telefono_efectivo"], df["idioma"])
+    ]
     df = df[df["telefono"].notna()]
     df["fecha_reserva_parsed"] = pd.to_datetime(df["fecha_reserva"], errors="coerce", utc=True)
 
@@ -439,7 +495,8 @@ def build_clientes_from_reservas(df_nombre_reserva: pd.DataFrame) -> pd.DataFram
         "status_boarding_passes": "no_booking",
     })
 
-    out = df_dropna_phones(out, "telefono")
+    # aquí también pasamos el idioma
+    out = df_dropna_phones(out, "telefono", lang_col="idioma")  # <- NUEVO parámetro lang_col
     return out[
         ["nombre","telefono","created_at","destino","status_drumwit","status_reserva",
          "is_user_required","is_ai_mode","idioma","status_boarding_passes","nickname"]
@@ -462,7 +519,7 @@ def fetch_existing_phones() -> set[str]:
         if not rows:
             break
         for r in rows:
-            tel = normalize_phone(r.get("telefono"))
+            tel = normalize_phone(r.get("telefono"))  # lang=None -> solo limpia, no añade prefijo
             if tel:
                 phones.add(tel)
             last_id = r["cliente_id"]
@@ -588,11 +645,11 @@ def pipeline_upsert_nocturno(run_query_func) -> None:
 # ============================================================
 if __name__ == "__main__":
     mode = os.getenv("ETL_MODE", "nocturno").lower()  # "incremental" o "nocturno"
-    mode == "nocturno"
+    mode = "incremental"
     if mode == "incremental":
         pipeline_incremental_horario(run_query)
     elif mode == "nocturno":
         pipeline_upsert_nocturno(run_query)
     else:
-        log.error("ETL_MODE desconocido: %s (usa 'incremental' o 'nocturno')")
+        log.error("ETL_MODE desconocido: %s (usa 'incremental' o 'nocturno')", mode)
         sys.exit(2)

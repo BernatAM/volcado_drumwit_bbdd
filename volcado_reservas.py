@@ -60,15 +60,65 @@ def mysql_conn():
 # ------------------------
 # Utilidades
 # ------------------------
-PHONE_RE = re.compile(r"\s+")
 
-def normalize_phone(phone_raw: str) -> str:
-    s = (phone_raw or "").strip()
-    s = PHONE_RE.sub("", s)
-    s = s.replace("+", "")
-    if not s.startswith("34") and s != "":
-        s = "34" + s
-    return s
+# Prefijos por idioma
+COUNTRY_PREFIX_BY_LANG = {
+    "es": "34",
+    "esp": "34",
+    "it": "39",
+    "fr": "33",
+    "pt": "351",
+    "en": "34"
+}
+
+def normalize_phone(phone_raw, lang: str | None = None) -> str | None:
+    """
+    Normaliza a dígitos (formato E.164 sin '+'):
+    - elimina todo lo que no sea dígito
+    - si empieza por '00' => lo quita
+    - quita ceros domésticos iniciales
+    - si el resultado tiene 11 dígitos -> se devuelve tal cual
+    - si tiene menos de 11 y tenemos idioma -> se antepone prefijo del país
+    - si >15 dígitos => descarta (None)
+    """
+    if phone_raw is None:
+        return None
+
+    s = str(phone_raw)
+    # dejar solo dígitos
+    digits = re.sub(r"\D+", "", s)
+    if not digits:
+        return None
+
+    # quitar 00 inicial (formato internacional)
+    if digits.startswith("00"):
+        digits = digits[2:]
+
+    # quitar ceros domésticos iniciales (0 de fijo/móvil local)
+    digits = digits.lstrip("0")
+
+    if not digits:
+        return None
+
+    # si ya tiene 11 dígitos (ej. 34 + 9 ES) lo damos por bueno
+    if len(digits) == 11:
+        return digits
+
+    # si tiene menos de 11, añadimos prefijo según idioma
+    if len(digits) < 11:
+        prefix = None
+        if lang:
+            lang_key = str(lang).lower()
+            prefix = COUNTRY_PREFIX_BY_LANG.get(lang_key)
+        if prefix:
+            digits = prefix + digits
+
+    # si se ha ido de madre, descartamos
+    if len(digits) > 15:
+        return None
+
+    return digits or None
+
 
 def chunked(iterable, size=500):
     buf = []
@@ -196,6 +246,7 @@ def load_cliente_map() -> dict:
         if not rows:
             break
         for r in rows:
+            # Aquí NO pasamos idioma: los teléfonos ya están normalizados con prefijo
             tel = normalize_phone(r.get("telefono") or "")
             if tel:
                 telefono_to_cliente[tel] = r["cliente_id"]
@@ -282,7 +333,8 @@ def reservas_base_rows(mysql_rows, telefono_map):
     skipped_no_cliente = 0
     skipped_bad_fecha_ida = 0
     for r in mysql_rows:
-        tel_norm = normalize_phone(r["telefono_eff"])
+        # Usa idioma de la reserva para normalizar el teléfono
+        tel_norm = normalize_phone(r["telefono_eff"], r.get("idioma"))
         cliente_id = telefono_map.get(tel_norm)
         if not cliente_id:
             skipped_no_cliente += 1
@@ -413,7 +465,8 @@ def pipeline_incremental():
         reservas_base_idx = {}
         base_rows_sb = []
         for r in base_rows_mysql:
-            tel_norm = normalize_phone(r["telefono_eff"])
+            # normalizamos teléfono usando idioma de la reserva
+            tel_norm = normalize_phone(r["telefono_eff"], r.get("idioma"))
             cliente_id = tel_map.get(tel_norm)
             if not cliente_id:
                 continue
@@ -427,7 +480,6 @@ def pipeline_incremental():
             }
 
             fecha_ida = clean_date_mysql(r.get("fecha_salida"))
-
             row["fecha_ida"] = fecha_ida
 
             _safe_set_fecha_vuelta(row, fecha_ida, r.get("fecha_llegada"))
@@ -469,7 +521,7 @@ def pipeline_nocturno():
         reservas_base_idx = {}
         base_rows_sb = []
         for r in base_rows_mysql:
-            tel_norm = normalize_phone(r["telefono_eff"])
+            tel_norm = normalize_phone(r["telefono_eff"], r.get("idioma"))
             cliente_id = tel_map.get(tel_norm)
             if not cliente_id:
                 continue
@@ -516,7 +568,7 @@ def pipeline_nocturno():
 # ------------------------
 if __name__ == "__main__":
     log.info("Iniciando ETL reservas | ETL_MODE=%s", ETL_MODE)
-    ETL_MODE = 'nocturno'
+    ETL_MODE = 'incremental'
     try:
         if ETL_MODE == "incremental":
             pipeline_incremental()

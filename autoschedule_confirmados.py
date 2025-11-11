@@ -76,7 +76,7 @@ def compute_send_datetime_madrid(created_mad: datetime) -> datetime:
     end   = created_mad.replace(hour=20, minute=30, second=0, microsecond=0)
 
     if start.time() <= created_mad.time() <= end.time():
-        return created_mad + timedelta(minutes=30)
+        return created_mad + timedelta(minutes=60)
 
     minutes = created_mad.minute
     if created_mad.time() < start.time():
