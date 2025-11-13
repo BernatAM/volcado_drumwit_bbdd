@@ -273,6 +273,9 @@ def build_item_canjeo(row: Dict[str, Any]) -> Optional[OPCItem]:
         flow_id = flow_id + "_singular"
     json_vars = json.dumps({"nombre": nickname}, ensure_ascii=False)
 
+    if idioma == 'pt':
+        idioma = 'pt_pt'
+
     return OPCItem(
         flow_id=flow_id,
         flow_type="canjeo",
@@ -310,6 +313,8 @@ def build_item_regalo(row: Dict[str, Any]) -> Optional[OPCItem]:
     if row.get("numero_viajeros") == 1 and idioma == 'es':
         flow_id = flow_id + "_singular"
     json_vars = json.dumps({"nombre": nickname}, ensure_ascii=False)
+    if idioma == 'pt':
+        idioma = 'pt_pt'
 
     return OPCItem(
         flow_id=flow_id,
