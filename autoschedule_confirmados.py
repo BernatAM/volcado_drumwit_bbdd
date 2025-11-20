@@ -235,12 +235,14 @@ def build_item_confirmados(row: Dict[str, Any]) -> Optional[OPCItem]:
     candidatos = CONFIRMAR_REPETIDOR if es_repetidor else CONFIRMAR_NORMAL
 
     flow_id = candidatos[djb2_hash(id_reserva) % len(candidatos)]
-    if row.get("numero_viajeros") == 1:
+    if idioma == 'pt':
+        idioma = 'pt_pt'
+    
+    if row.get("numero_viajeros") == 1 and idioma=='es':
         flow_id = flow_id + "_singular"
     json_vars = json.dumps({"nombre": nickname}, ensure_ascii=False)
 
-    if idioma == 'pt':
-        idioma = 'pt_pt'
+    
 
     return OPCItem(
         flow_id=flow_id,
@@ -269,7 +271,7 @@ def build_item_canjeo(row: Dict[str, Any]) -> Optional[OPCItem]:
     idioma = (cliente.get("idioma") or cliente.get("lang") or "es")
 
     flow_id = CANJEO_CANDS[djb2_hash(id_reserva) % len(CANJEO_CANDS)]
-    if row.get("numero_viajeros") == 1:
+    if row.get("numero_viajeros") == 1 and idioma=='es':
         flow_id = flow_id + "_singular"
     json_vars = json.dumps({"nombre": nickname}, ensure_ascii=False)
 
