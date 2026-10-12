@@ -1,0 +1,10 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><title>PROD Drumwit8 — pendiente de datos</title>
+<style>body{font:16px system-ui;max-width:950px;margin:40px auto;padding:0 24px;color:#192a3c}h1{font-size:28px}.status{padding:16px;background:#fff0d2;font-weight:700}table{border-collapse:collapse;width:100%}td,th{padding:10px;text-align:left;border-bottom:1px solid #ddd}li{margin:8px 0}</style>
+<h1>Nueva conexión de producción Drumwit8</h1><p>Comprobación: 12/10/2026 23:45:11, Europe/Madrid.</p>
+<p class="status">AWAITING_PRODUCTION_DATA — carga pendiente confirmada por el usuario</p>
+<p>La conexión funciona con usrNubitaPROD_8 en 213.192.239.166:3306, base dR5mW3t_8_Pr4d_BD. El esquema requerido de Drumwit8 está presente.</p>
+<h2>Datos disponibles en PROD</h2><table><tr><th>Tabla</th><th>Filas</th></tr><tr><td>booking</td><td>0</td></tr><tr><td>gift</td><td>0</td></tr><tr><td>traveler</td><td>0</td></tr><tr><td>booking_contact_details</td><td>0</td></tr><tr><td>gift_contact_details</td><td>0</td></tr><tr><td>booking_flights</td><td>0</td></tr><tr><td>destination</td><td>0</td></tr></table>
+<p>Los controles de integridad sobre tablas vacías no acreditan una migración correcta. Todavía no se puede comparar el resultado de PROD con legacy.</p>
+<h2>Configuración preparada</h2><ul><li>.env y .env.prod contienen la nueva conexión. Las credenciales están excluidas de Git.</li><li>Las variables del destino Supabase y las conexiones de legacy y TEST se conservan. Hay una copia privada de la configuración anterior.</li><li>Las comprobaciones han utilizado consultas y transacciones de sólo lectura. No se han reiniciado procesos ni ejecutado upserts, cambios de esquema o mensajes.</li></ul>
+<h2>Continuación tras la carga</h2><p>Comprobar conteos y fechas del clon, repetir el preflight y comparar las salidas completas e incrementales de legacy frente a PROD con un corte común. Revisar las diferencias históricas detectadas en TEST antes de activar cargas o mensajes.</p>
+<p><a href="prod8-preflight.json">Evidencia de acceso, esquema y conteos</a> · <a href="migration-report.html">Comparación previa legacy / TEST</a></p></html>

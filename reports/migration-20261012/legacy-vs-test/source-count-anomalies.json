@@ -1,0 +1,21 @@
+{
+  "traveler_columns": [
+    "type",
+    "name",
+    "last_name_1",
+    "last_name_2",
+    "birthdate",
+    "nationality",
+    "document_type",
+    "document_number",
+    "document_expiration_date",
+    "id",
+    "booking_id"
+  ],
+  "gift_paid_counts": [
+    {
+      "total": 31230,
+      "zero_counts": 4780
+    }
+  ]
+}

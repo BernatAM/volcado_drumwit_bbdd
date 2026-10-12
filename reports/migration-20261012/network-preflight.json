@@ -1,0 +1,14 @@
+{
+  "213.192.239.166": {
+    "status": "tcp_failed",
+    "error": "TimeoutError",
+    "errno": null,
+    "seconds": 8.02
+  },
+  "www.drumwit.com": {
+    "status": "tcp_failed",
+    "error": "TimeoutError",
+    "errno": null,
+    "seconds": 8.06
+  }
+}

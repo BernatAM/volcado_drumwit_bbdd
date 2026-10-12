@@ -1,0 +1,134 @@
+{
+  "started_at": "2026-10-12T21:09:23.568196+00:00",
+  "environment": "test",
+  "read_only": true,
+  "status": "SCHEMA_READ_COMPLETED",
+  "preflight": {
+    "schema": "drumwit8",
+    "info": {
+      "database_name": "dr5MWT2st_BD",
+      "version": "11.4.10-MariaDB-deb12",
+      "server_now": "2026-10-12T23:09:24",
+      "time_zone": "SYSTEM",
+      "tls_cipher": ""
+    },
+    "quality": {
+      "invalid_or_duplicate_codes": 0,
+      "paid_bookings_without_contact": 0,
+      "paid_gifts_without_contact": 0,
+      "duplicate_booking_contacts": 0,
+      "duplicate_gift_contacts": 0,
+      "orphan_travelers": 0,
+      "orphan_flights": 0,
+      "invalid_traveler_types": 0,
+      "paid_bookings_with_invalid_gift": 0,
+      "paid_bookings_return_before_departure": 0,
+      "paid_bookings_without_creation_date": 0,
+      "paid_gifts_without_creation_date": 0,
+      "paid_gifts_negative_traveler_count": 0
+    },
+    "warnings": [],
+    "missing_columns": {},
+    "traveler_booking_id_index": true
+  },
+  "schema_detected": "drumwit8",
+  "queries": [
+    {
+      "seconds": 0.087,
+      "rows": 1,
+      "sql_sha256": "dbb1c561e82e4749fe30f6845de2305a4f385e805e1705d32962f8d7366245e9"
+    },
+    {
+      "seconds": 0.11,
+      "rows": 1,
+      "sql_sha256": "2632a0b14100e6c837d00467964d6e02ac33864a5ef7528c84a7e5e21b252ee1"
+    },
+    {
+      "seconds": 0.185,
+      "rows": 969,
+      "sql_sha256": "affc728a19ab8222fbba2130b1450d8a38c3ecf37fc79608021dc28353d34869"
+    },
+    {
+      "seconds": 0.09,
+      "rows": 82,
+      "sql_sha256": "dab1cf581e36295987947059f9c35f61a67fdc91a826bb09afd33a4b9516e867"
+    },
+    {
+      "seconds": 3.142,
+      "rows": 1,
+      "sql_sha256": "1d38f8a72c9d6e037f3a585546e4c8a95a62980665740e8d5293e2b600eb2454"
+    },
+    {
+      "seconds": 0.349,
+      "rows": 1,
+      "sql_sha256": "8b3565d1ceb80b0b792df776568de605d292a453f546f4337f3af6adc2abff60"
+    },
+    {
+      "seconds": 0.171,
+      "rows": 1,
+      "sql_sha256": "a62fa1a5da1354c18959de09dd1fe93248e51bc8ed15d00a9d43b38519c342b6"
+    },
+    {
+      "seconds": 0.124,
+      "rows": 1,
+      "sql_sha256": "7483121499118c19e822ba67e6fac0627272bb843ce958d2c2ff8cfe1d615706"
+    },
+    {
+      "seconds": 0.1,
+      "rows": 1,
+      "sql_sha256": "ad9c2f43d4c896b2c9d18ed02a144aed9c31742cb12dc5a98f32110d02cb40ce"
+    },
+    {
+      "seconds": 0.607,
+      "rows": 1,
+      "sql_sha256": "3b6b48cc6b95dedad0a92dbf8a97f732720b9fa2b33ca5074d717ce32187c4a7"
+    },
+    {
+      "seconds": 0.323,
+      "rows": 1,
+      "sql_sha256": "80311cfd2b816be121020205bd043f24b05959482621f949df4113ae546922bb"
+    },
+    {
+      "seconds": 0.37,
+      "rows": 1,
+      "sql_sha256": "3fb2ee8e89382f890c7b06aebc85a238bd2fbf43636eccc15d8019e5d4c124eb"
+    },
+    {
+      "seconds": 0.403,
+      "rows": 1,
+      "sql_sha256": "d0ed79419ea71b216cc11ff9c50491a88600c95d4b66e82bd2c6156b89543a1b"
+    },
+    {
+      "seconds": 0.132,
+      "rows": 1,
+      "sql_sha256": "1276f5191a9d4a24ee2ea35a7df73487f924ce956908938900ad50c4fba4f50c"
+    },
+    {
+      "seconds": 0.129,
+      "rows": 1,
+      "sql_sha256": "05bcdcbb0771ce889d1f86b7873a4ac1b92cce1a90486e3386a4aaf8d1a7f2f5"
+    },
+    {
+      "seconds": 0.104,
+      "rows": 1,
+      "sql_sha256": "14755cc5e07e20b8c5139ba4924335b52530da4d9287b8706aa7139b78a5634f"
+    },
+    {
+      "seconds": 0.106,
+      "rows": 1,
+      "sql_sha256": "db83bd742eb49ff19969f30e48ea60efa79c8c85401bf2a4d42a98aa8b09bf58"
+    },
+    {
+      "seconds": 0.088,
+      "rows": 2,
+      "sql_sha256": "13b8ba8c7b52bf5eb74fc6519bb4cdff5d3918c986bf5f87fc671605549e4426"
+    }
+  ],
+  "info": {
+    "database_name": "dr5MWT2st_BD",
+    "version": "11.4.10-MariaDB-deb12",
+    "server_now": "2026-10-12T23:09:24",
+    "time_zone": "SYSTEM",
+    "tls_cipher": ""
+  }
+}

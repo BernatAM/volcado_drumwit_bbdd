@@ -1,0 +1,56 @@
+{
+  "phone_change_patterns": {
+    "legacy_has_extra_prefix": 309,
+    "test_adds_prefix": 161,
+    "other_phone_change": 219,
+    "different_prefix_same_last9": 363
+  },
+  "traveler_value_changes": {
+    "gift.2->0": 4394,
+    "gift.3->0": 180,
+    "gift.5->0": 21,
+    "gift.1->0": 97,
+    "gift.4->0": 75,
+    "booking.2->4": 60,
+    "booking.4->5": 3,
+    "booking.3->6": 12,
+    "booking.4->8": 4,
+    "booking.3->4": 2,
+    "booking.1->2": 5,
+    "gift.7->0": 2,
+    "booking.2->8": 2,
+    "gift.6->0": 8,
+    "booking.6->12": 2,
+    "booking.5->10": 6,
+    "booking.4->6": 1,
+    "booking.8->16": 1,
+    "gift.8->0": 1,
+    "booking.5->6": 1
+  },
+  "return_date_changes": [
+    {
+      "legacy_departure": "2021-07-16",
+      "legacy_return": "2021-07-19",
+      "test_departure": "2021-07-16",
+      "test_return": "2021-07-18"
+    },
+    {
+      "legacy_departure": "2021-08-11",
+      "legacy_return": "2021-08-13",
+      "test_departure": "2021-08-11",
+      "test_return": "2021-08-14"
+    }
+  ],
+  "test_codes_absent_from_legacy": {
+    "gift": 536,
+    "year_2020": 414,
+    "year_2019": 117,
+    "year_2024": 1,
+    "year_2023": 2,
+    "year_2022": 2
+  },
+  "legacy_codes_absent_from_test": {
+    "before_clone": 22,
+    "after_clone": 27
+  }
+}

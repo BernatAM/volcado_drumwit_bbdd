@@ -1,0 +1,10 @@
+{
+  "checked_at": "2026-10-12T17:17:21.049368+00:00",
+  "environment": "test",
+  "database": "dr5MWT2st_BD",
+  "read_only": true,
+  "server_authentication": true,
+  "database_visible": false,
+  "booking_select_allowed": false,
+  "booking_error_code": 1142
+}

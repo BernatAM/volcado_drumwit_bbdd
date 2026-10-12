@@ -1,0 +1,36 @@
+{
+  "checked_at": "2026-10-12T21:18:30.170435+00:00",
+  "read_only": true,
+  "results": [
+    {
+      "label": "legacy_saved_host",
+      "host": "www.drumwit.com",
+      "read_only": true,
+      "authenticated": true,
+      "visible_database_names": [
+        "dR5Mwit_Pr4dBdV3"
+      ],
+      "visible_model_tables": [
+        {
+          "database_name": "dR5Mwit_Pr4dBdV3",
+          "key_tables": "pasajero,pasajeros__reserva,reserva"
+        }
+      ]
+    },
+    {
+      "label": "legacy_user_new_host",
+      "host": "213.192.239.166",
+      "read_only": true,
+      "authenticated": true,
+      "visible_database_names": [
+        "dR5Mwit_Pr4dBdV3"
+      ],
+      "visible_model_tables": [
+        {
+          "database_name": "dR5Mwit_Pr4dBdV3",
+          "key_tables": "pasajero,pasajeros__reserva,reserva"
+        }
+      ]
+    }
+  ]
+}

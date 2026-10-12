@@ -1,0 +1,57 @@
+{
+  "freshness": [
+    {
+      "first_created": "2017-02-14T07:02:53",
+      "last_created": "2026-10-12T23:13:36",
+      "last_updated": "2026-10-12T23:13:36"
+    }
+  ],
+  "status_counts_before_day11": [
+    {
+      "estado": null,
+      "regalo": 0,
+      "n": 14
+    },
+    {
+      "estado": 0,
+      "regalo": 0,
+      "n": 25197
+    },
+    {
+      "estado": 0,
+      "regalo": 1,
+      "n": 17034
+    },
+    {
+      "estado": 1,
+      "regalo": 0,
+      "n": 93288
+    },
+    {
+      "estado": 1,
+      "regalo": 1,
+      "n": 5584
+    },
+    {
+      "estado": 3,
+      "regalo": 0,
+      "n": 695
+    },
+    {
+      "estado": 3,
+      "regalo": 1,
+      "n": 25118
+    }
+  ],
+  "created_after_test_latest_before_day11": [
+    {
+      "regalo": 0,
+      "n": 23
+    },
+    {
+      "regalo": 1,
+      "n": 14
+    }
+  ],
+  "older_rows_changed_after_test_latest": []
+}

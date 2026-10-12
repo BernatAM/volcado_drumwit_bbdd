@@ -1,0 +1,50 @@
+{
+  "started_at": "2026-10-12T16:38:07.547766+00:00",
+  "read_only": true,
+  "status": "REVIEW_REQUIRED",
+  "blockers": [],
+  "review_items": [
+    "Hay referencias de cola ausentes del histórico visible; revisar causa y mensajes pendientes antes de activar planificadores"
+  ],
+  "checks": {
+    "clientes": {
+      "rows": 120010,
+      "duplicate_client_ids": 0,
+      "without_normalizable_phone": 0,
+      "duplicate_normalized_phones": 0
+    },
+    "reservas": {
+      "rows": 105302,
+      "duplicate_conflict_keys": 0,
+      "without_identifier": 0,
+      "unknown_cliente_id": 0,
+      "gift_rows": 10800,
+      "gift_rows_with_trip_dates": 0
+    },
+    "cola": {
+      "rows": 41156,
+      "duplicate_primary_keys": 0,
+      "rows_with_reservation_reference": 41156,
+      "references_absent_from_visible_reservations": 16,
+      "active_unsent_references_absent": 0,
+      "absent_reference_flow_types": {
+        "como_ha_ido": 2,
+        "vuestra_aventura": 13,
+        "regalo_confirmado": 1
+      },
+      "flow_type_counts": {
+        "confirmados": 6287,
+        "canjeo": 5477,
+        "regalo_confirmado": 5232,
+        "como_ha_ido": 12129,
+        "vuestra_aventura": 12031
+      }
+    }
+  },
+  "notes": [
+    "Sólo filas visibles con la clave actual. Los conteos no acreditan restricciones UNIQUE ni permisos de escritura.",
+    "REST no ofrece snapshot común entre tablas; se verifica que el conteo no cambie, pero no se descartan actualizaciones concurrentes.",
+    "Las referencias de cola ausentes pueden pertenecer a histórico archivado o flujos manuales: requieren revisión, nunca borrado automático.",
+    "La reconciliación de códigos nuevos y enlaces reales con cliente_id requiere acceso a MySQL."
+  ]
+}

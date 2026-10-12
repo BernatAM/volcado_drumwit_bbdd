@@ -259,98 +259,122 @@ def load_cliente_map() -> dict:
 # ------------------------
 # Queries MySQL (con telefono_eff y nombre_eff)
 # ------------------------
-SQL_RESERVA_BASE = """
+SQL_BOOKING_BASE = """
 SELECT
-    r.id AS reserva_id,
-    COALESCE(NULLIF(r.localizador,''), CAST(r.id AS CHAR)) AS id_reserva,
-    r.fecha_reserva,
-    r.fecha_salida,
-    r.fecha_llegada,
-    -- Teléfono efectivo: principal o comprador_regalo si el principal está vacío
-    COALESCE(NULLIF(r.telefono, ''), NULLIF(r.telefono_comprador_regalo, '')) AS telefono_eff,
-    -- Nombre efectivo (por si luego lo necesitas)
-    COALESCE(NULLIF(r.nombre_regalo, ''), NULLIF(r.nombre_comprador_regalo, ''), NULLIF(r.nickname, '')) AS nombre_eff,
-    r.idioma,
-    r.regalo,
-    r.id_reserva_compradora_regalo,
-    r.num_viajeros as numero_viajeros
-FROM reserva r
-WHERE 
-r.estado > 0 AND {where_clause}
+    b.id AS reserva_id,
+    b.code AS id_reserva,
+    b.created_at AS fecha_reserva,
+    b.departure_date AS fecha_salida,
+    DATE_ADD(b.departure_date, INTERVAL b.trip_length_in_nights DAY) AS fecha_llegada,
+    CASE WHEN NULLIF(TRIM(bcd.phone_number), '') IS NOT NULL
+              AND NULLIF(TRIM(bcd.phone_country_code), '') IS NOT NULL
+         THEN CONCAT(TRIM(bcd.phone_country_code), TRIM(bcd.phone_number)) END AS telefono_eff,
+    COALESCE(NULLIF(bcd.nickname, ''), NULLIF(tra.name, ''), NULLIF(bcd.name, '')) AS nombre_eff,
+    b.language AS idioma,
+    0 AS regalo,
+    b.gift_id AS id_reserva_compradora_regalo,
+    (SELECT COUNT(*) FROM traveler tr WHERE tr.booking_id = b.id) AS numero_viajeros
+FROM booking b
+JOIN booking_contact_details bcd ON bcd.booking_id = b.id
+LEFT JOIN traveler tra ON tra.id = bcd.traveler_id
+WHERE b.status = 'PAID' AND {where_clause}
 """
+
+SQL_GIFT_BASE = """
+SELECT
+    g.id AS reserva_id,
+    g.code AS id_reserva,
+    g.created_at AS fecha_reserva,
+    NULL AS fecha_salida,
+    NULL AS fecha_llegada,
+    CASE WHEN NULLIF(TRIM(gcd.phone_number), '') IS NOT NULL
+              AND NULLIF(TRIM(gcd.phone_country_code), '') IS NOT NULL
+         THEN CONCAT(TRIM(gcd.phone_country_code), TRIM(gcd.phone_number)) END AS telefono_eff,
+    COALESCE(NULLIF(gcd.nickname, ''), NULLIF(gcd.name, '')) AS nombre_eff,
+    g.language AS idioma,
+    1 AS regalo,
+    NULL AS id_reserva_compradora_regalo,
+    (COALESCE(g.adult_travelers_count, 0) + COALESCE(g.child_travelers_count, 0)
+     + COALESCE(g.infant_travelers_count, 0)) AS numero_viajeros
+FROM gift g
+JOIN gift_contact_details gcd ON gcd.gift_id = g.id
+WHERE g.status = 'PAID' AND {where_clause}
+"""
+
+SQL_RESERVA_BASE = (
+    SQL_BOOKING_BASE.replace("{where_clause}", "{booking_where}")
+    + "\nUNION ALL\n"
+    + SQL_GIFT_BASE.replace("{where_clause}", "{gift_where}")
+)
 
 SQL_BOOKING_ENRICH = """
 SELECT
-    r.id AS reserva_id,
-    COALESCE(NULLIF(r.localizador,''), CAST(r.id AS CHAR)) AS id_reserva,
-    r.fecha_reserva,   -- blindaje NOT NULL en enriquecimiento
-    r.fecha_salida,
-    r.fecha_llegada,
-    COALESCE(NULLIF(r.telefono, ''), NULLIF(r.telefono_comprador_regalo, '')) AS telefono_eff,
-    COALESCE(NULLIF(r.nombre_regalo, ''), NULLIF(r.nombre_comprador_regalo, ''), NULLIF(r.nickname, '')) AS nombre_eff,
-    r.idioma,
-    r.regalo,
-    r.id_reserva_compradora_regalo,
+    b.id AS reserva_id,
+    b.code AS id_reserva,
+    b.created_at AS fecha_reserva,
+    b.departure_date AS fecha_salida,
+    DATE_ADD(b.departure_date, INTERVAL b.trip_length_in_nights DAY) AS fecha_llegada,
+    CASE WHEN NULLIF(TRIM(bcd.phone_number), '') IS NOT NULL
+              AND NULLIF(TRIM(bcd.phone_country_code), '') IS NOT NULL
+         THEN CONCAT(TRIM(bcd.phone_country_code), TRIM(bcd.phone_number)) END AS telefono_eff,
+    COALESCE(NULLIF(bcd.nickname, ''), NULLIF(tra.name, ''), NULLIF(bcd.name, '')) AS nombre_eff,
+    b.language AS idioma,
+    0 AS regalo,
+    b.gift_id AS id_reserva_compradora_regalo,
     bf.departure_time AS hora_ida,
     bf.return_time    AS hora_vuelta,
-    d.nombre_es       AS destino_nombre
-FROM reserva r
-JOIN booking_flights bf ON bf.booking_id = r.id
-LEFT JOIN destino d ON d.id = bf.destination_id
-WHERE
-r.estado > 0 AND {where_clause}
+    d.name_es AS destino_nombre
+FROM booking b
+JOIN booking_contact_details bcd ON bcd.booking_id = b.id
+LEFT JOIN traveler tra ON tra.id = bcd.traveler_id
+JOIN booking_flights bf ON bf.booking_id = b.id
+LEFT JOIN destination d ON d.id = bf.destination_id
+WHERE b.status = 'PAID' AND {where_clause}
 """
 
-def build_where(mode: str, hours: int = INCREMENTAL_HOURS) -> str:
-    # Filtros fijos (para evitar fechas mal formadas)
-    conds = [
-        "(r.fecha_salida IS NULL OR r.fecha_salida <> '0000-00-00')",
-        "(r.fecha_llegada IS NULL OR r.fecha_llegada <> '0000-00-00')",
-        "(r.fecha_llegada IS NULL OR r.fecha_llegada >= '1970-01-02')",
-    ]
-
-    # Filtro incremental (solo si toca)
+def build_where(mode: str, hours: int = INCREMENTAL_HOURS, alias: str = "b") -> str:
+    if alias not in {"b", "g"}:
+        raise ValueError("El alias debe ser b (booking) o g (gift)")
+    if mode not in {"incremental", "nocturno", "full"}:
+        raise ValueError("Modo ETL desconocido")
+    if isinstance(hours, bool) or not isinstance(hours, int) or hours <= 0:
+        raise ValueError("hours debe ser un entero positivo")
     if mode == "incremental":
-        conds.insert(
-            0,
-            f"(r.ultima_modificacion >= NOW() - INTERVAL {hours} HOUR "
-            f"OR r.fecha_reserva >= NOW() - INTERVAL {hours} HOUR)"
+        return (
+            f"({alias}.updated_at >= NOW() - INTERVAL {hours} HOUR "
+            f"OR {alias}.created_at >= NOW() - INTERVAL {hours} HOUR)"
         )
-
-    # En modo "full" no añadimos nada más: carga todo el histórico
-    return " AND ".join(conds)
+    return "1=1"
 
 # ------------------------
 # Transformación a registros Supabase
 # ------------------------
 def reservas_base_rows(mysql_rows, telefono_map):
     """
-    - fecha_ida (NOT NULL): si inválida -> descartar fila
-    - fecha_vuelta/fecha_reserva: opcionales; si inválidas -> omitir campo
-    - regalo (0/1) y compradora (nullable)
+    Conserva códigos únicos, viajeros y relaciones de canje.
+    Los regalos no tienen fechas de viaje; la tabla destino debe admitir NULL.
     """
     out = []
     skipped_no_cliente = 0
-    skipped_bad_fecha_ida = 0
     for r in mysql_rows:
-        # Usa idioma de la reserva para normalizar el teléfono
-        tel_norm = normalize_phone(r["telefono_eff"], r.get("idioma"))
+        tel_norm = normalize_phone(r["telefono_eff"])
         cliente_id = telefono_map.get(tel_norm)
         if not cliente_id:
             skipped_no_cliente += 1
             continue
 
         fecha_ida = clean_date_mysql(r.get("fecha_salida"))
-        if not fecha_ida:
-            skipped_bad_fecha_ida += 1
-            continue
-
         row = {
             "cliente_id": cliente_id,
             "id_reserva": r["id_reserva"],
             "destino": "Pendiente",
             "fecha_ida": fecha_ida,
+            "fecha_vuelta": None,
             "regalo": r.get("regalo"),
+            "numero_viajeros": r.get("numero_viajeros"),
+            "id_reserva_compradora_regalo": clean_id_reserva_compradora(
+                r.get("id_reserva_compradora_regalo")
+            ),
         }
 
         _safe_set_fecha_vuelta(row, fecha_ida, r.get("fecha_llegada"))
@@ -359,16 +383,10 @@ def reservas_base_rows(mysql_rows, telefono_map):
         if fecha_reserva:
             row["fecha_reserva"] = fecha_reserva
 
-        compradora = clean_id_reserva_compradora(r.get("id_reserva_compradora_regalo"))
-        if compradora is not None:
-            row["id_reserva_compradora_regalo"] = compradora
-
         out.append(row)
 
     if skipped_no_cliente:
         log.warning("Reservas omitidas por no encontrar cliente por teléfono: %d", skipped_no_cliente)
-    if skipped_bad_fecha_ida:
-        log.warning("Reservas omitidas por fecha_ida inválida (0000-00-00): %d", skipped_bad_fecha_ida)
     return out
 
 def reservas_enrichment_rows(mysql_rows, telefono_map, reservas_base_index):
@@ -383,7 +401,8 @@ def reservas_enrichment_rows(mysql_rows, telefono_map, reservas_base_index):
     fallback_fr = 0
 
     for r in mysql_rows:
-        reserva_id = r["reserva_id"]
+        # booking.id y gift.id pueden coincidir; el código identifica el negocio.
+        reserva_id = r["id_reserva"]
         base_pair = reservas_base_index.get(reserva_id)
         if not base_pair:
             missing_base += 1
@@ -395,6 +414,9 @@ def reservas_enrichment_rows(mysql_rows, telefono_map, reservas_base_index):
             "id_reserva": id_reserva,
             "destino": (r.get("destino_nombre") or "Pendiente"),
             "regalo": r.get("regalo"),
+            "id_reserva_compradora_regalo": clean_id_reserva_compradora(
+                r.get("id_reserva_compradora_regalo")
+            ),
         }
 
         # Horas (normalizadas a HH:MM:SS)
@@ -422,10 +444,6 @@ def reservas_enrichment_rows(mysql_rows, telefono_map, reservas_base_index):
 
         _safe_set_fecha_vuelta(row, fecha_ida, r.get("fecha_llegada"))
 
-        compradora = clean_id_reserva_compradora(r.get("id_reserva_compradora_regalo"))
-        if compradora is not None:
-            row["id_reserva_compradora_regalo"] = compradora
-
         out.append(row)
 
     if missing_base:
@@ -452,123 +470,43 @@ def upsert_reservas(rows):
 # ------------------------
 # Pipelines
 # ------------------------
-def pipeline_incremental():
-    where = build_where("incremental")
+def _pipeline(mode):
+    booking_where = build_where(mode, alias="b")
+    gift_where = build_where(mode, alias="g")
     with mysql_conn() as conn, conn.cursor() as cur:
         tel_map = load_cliente_map()
-
-        # Base
-        cur.execute(SQL_RESERVA_BASE.format(where_clause=where))
+        cur.execute(SQL_RESERVA_BASE.format(
+            booking_where=booking_where, gift_where=gift_where
+        ))
         base_rows_mysql = cur.fetchall() or []
-        log.info("Reservas base MySQL recuperadas (incremental): %d", len(base_rows_mysql))
-
-        reservas_base_idx = {}
-        base_rows_sb = []
-        for r in base_rows_mysql:
-            # normalizamos teléfono usando idioma de la reserva
-            tel_norm = normalize_phone(r["telefono_eff"], r.get("idioma"))
-            cliente_id = tel_map.get(tel_norm)
-            if not cliente_id:
-                continue
-
-            row = {
-                "cliente_id": cliente_id,
-                "id_reserva": r["id_reserva"],
-                "destino": "Pendiente",
-                "regalo": r.get("regalo"),
-                "numero_viajeros": r.get("numero_viajeros"),
-            }
-
-            fecha_ida = clean_date_mysql(r.get("fecha_salida"))
-            row["fecha_ida"] = fecha_ida
-
-            _safe_set_fecha_vuelta(row, fecha_ida, r.get("fecha_llegada"))
-
-            fecha_reserva = clean_datetime_mysql(r.get("fecha_reserva"))
-            if fecha_reserva:
-                row["fecha_reserva"] = fecha_reserva
-
-            compradora = clean_id_reserva_compradora(r.get("id_reserva_compradora_regalo"))
-            if compradora is not None:
-                row["id_reserva_compradora_regalo"] = compradora
-
-            base_rows_sb.append(row)
-            reservas_base_idx[r["reserva_id"]] = (cliente_id, r["id_reserva"])
-
+        log.info("Reservas y regalos MySQL recuperados (%s): %d", mode, len(base_rows_mysql))
+        base_rows_sb = reservas_base_rows(base_rows_mysql, tel_map)
+        reservas_base_idx = {
+            row["id_reserva"]: (row["cliente_id"], row["id_reserva"])
+            for row in base_rows_sb
+        }
         inserted = upsert_reservas(base_rows_sb)
-        log.info("Upsert reservas base (incremental): %d", inserted)
-        log.info("Reservas base indexadas para enriquecimiento: %d", len(reservas_base_idx))
+        log.info("Upsert reservas y regalos (%s): %d", mode, inserted)
 
-        # Enriquecimiento
-        cur.execute(SQL_BOOKING_ENRICH.format(where_clause=where))
+        cur.execute(SQL_BOOKING_ENRICH.format(where_clause=booking_where))
         enrich_rows_mysql = cur.fetchall() or []
-        log.info("Registros booking_flights (incremental): %d", len(enrich_rows_mysql))
-
         enrich_rows_sb = reservas_enrichment_rows(enrich_rows_mysql, tel_map, reservas_base_idx)
         updated = upsert_reservas(enrich_rows_sb)
-        log.info("Upsert reservas con vuelos (incremental): %d", updated)
+        log.info("Upsert reservas con vuelos (%s): %d", mode, updated)
+
+
+def pipeline_incremental():
+    _pipeline("incremental")
+
 
 def pipeline_nocturno():
-    where = build_where("nocturno")
-    with mysql_conn() as conn, conn.cursor() as cur:
-        tel_map = load_cliente_map()
-
-        # Base
-        cur.execute(SQL_RESERVA_BASE.format(where_clause=where))
-        base_rows_mysql = cur.fetchall() or []
-        log.info("Reservas base MySQL recuperadas (nocturno): %d", len(base_rows_mysql))
-
-        reservas_base_idx = {}
-        base_rows_sb = []
-        for r in base_rows_mysql:
-            tel_norm = normalize_phone(r["telefono_eff"], r.get("idioma"))
-            cliente_id = tel_map.get(tel_norm)
-            if not cliente_id:
-                continue
-
-            row = {
-                "cliente_id": cliente_id,
-                "id_reserva": r["id_reserva"],
-                "destino": "Pendiente",
-                "regalo": r.get("regalo"),
-                "numero_viajeros": r.get("numero_viajeros"),
-            }
-
-            fecha_ida = clean_date_mysql(r.get("fecha_salida"))
-            row["fecha_ida"] = fecha_ida
-
-            _safe_set_fecha_vuelta(row, fecha_ida, r.get("fecha_llegada"))
-
-            fecha_reserva = clean_datetime_mysql(r.get("fecha_reserva"))
-            if fecha_reserva:
-                row["fecha_reserva"] = fecha_reserva
-
-            compradora = clean_id_reserva_compradora(r.get("id_reserva_compradora_regalo"))
-            if compradora is not None:
-                row["id_reserva_compradora_regalo"] = compradora
-
-            base_rows_sb.append(row)
-            reservas_base_idx[r["reserva_id"]] = (cliente_id, r["id_reserva"])
-
-        inserted = upsert_reservas(base_rows_sb)
-        log.info("Upsert reservas base (nocturno): %d", inserted)
-        log.info("Reservas base indexadas para enriquecimiento: %d", len(reservas_base_idx))
-
-        # Enriquecimiento
-        cur.execute(SQL_BOOKING_ENRICH.format(where_clause=where))
-        enrich_rows_mysql = cur.fetchall() or []
-        log.info("Registros booking_flights (nocturno): %d", len(enrich_rows_mysql))
-
-        enrich_rows_sb = reservas_enrichment_rows(enrich_rows_mysql, tel_map, reservas_base_idx)
-        updated = upsert_reservas(enrich_rows_sb)
-        log.info("Upsert reservas con vuelos (nocturno): %d", updated)
+    _pipeline("nocturno")
 
 # ------------------------
 # Main
 # ------------------------
 if __name__ == "__main__":
     log.info("Iniciando ETL reservas | ETL_MODE=%s", ETL_MODE)
-    ETL_MODE = 'incremental'
     try:
         if ETL_MODE == "incremental":
             pipeline_incremental()

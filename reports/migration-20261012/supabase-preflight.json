@@ -1,0 +1,31 @@
+{
+  "read_only": true,
+  "checks": {
+    "schema": {
+      "http_status": 401,
+      "error_code": null
+    },
+    "clientes": {
+      "http_status": 200,
+      "rows_visible": 1
+    },
+    "cliente_reservas": {
+      "http_status": 200,
+      "rows_visible": 1
+    },
+    "cola": {
+      "http_status": 200,
+      "rows_visible": 1
+    }
+  },
+  "nullable_date_evidence": {
+    "fecha_ida": {
+      "http_status": 200,
+      "existing_null_proves_nullable": true
+    },
+    "fecha_vuelta": {
+      "http_status": 200,
+      "existing_null_proves_nullable": true
+    }
+  }
+}

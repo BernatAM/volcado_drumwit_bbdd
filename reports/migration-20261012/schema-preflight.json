@@ -1,0 +1,10 @@
+{
+  "prod": {
+    "connection": "failed",
+    "error_code": 2003
+  },
+  "test": {
+    "connection": "failed",
+    "error_code": 2003
+  }
+}

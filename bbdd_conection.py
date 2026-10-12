@@ -61,7 +61,7 @@ if __name__ == '__main__':
 
     query = """
     SELECT *
-    FROM pasajero
+    FROM traveler
     limit 100
     """
     df = run_query(query)

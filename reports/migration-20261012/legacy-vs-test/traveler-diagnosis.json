@@ -1,0 +1,8 @@
+{
+  "changed_booking_count": 99,
+  "new_count_matches_legacy_relation_rows": 99,
+  "new_count_matches_legacy_distinct_passenger_ids": 99,
+  "test_contains_duplicate_traveler_details": 89,
+  "legacy_has_duplicate_passenger_relations": 0,
+  "legacy_num_viajeros_matches_distinct_details_test": 78
+}

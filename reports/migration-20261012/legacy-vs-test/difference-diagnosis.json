@@ -1,0 +1,43 @@
+{
+  "read_only": true,
+  "new_only_causes": {
+    "gift.legacy_zero_trip_date_filter": 19676,
+    "gift.code_absent_from_legacy": 536,
+    "booking.legacy_phone_or_other_transform": 12,
+    "booking.legacy_pre1970_return_filter": 1
+  },
+  "legacy_only_causes": {
+    "booking.after_clone": 19,
+    "booking.code_absent_from_test": 22,
+    "booking.test_status_not_paid": 1,
+    "gift.test_phone_or_other_transform": 1,
+    "gift.after_clone": 8
+  },
+  "common_code_field_changes": {
+    "cliente_id": {
+      "booking": 920,
+      "gift": 132
+    },
+    "numero_viajeros": {
+      "gift": 4778,
+      "gift.different_number": 4778,
+      "booking": 99,
+      "booking.different_number": 99
+    },
+    "fecha_vuelta": {
+      "booking": 2
+    }
+  },
+  "source_status_mapping": {
+    "booking.legacy_1.test_PAID": 93224,
+    "gift.legacy_0.test_PENDING": 17028,
+    "booking.legacy_0.test_PENDING": 24687,
+    "gift.legacy_1.test_PAID": 5577,
+    "gift.legacy_3.test_PAID": 25117,
+    "booking.legacy_3.test_PAID": 695,
+    "booking.legacy_None.test_PENDING": 14,
+    "booking.legacy_1.test_PENDING": 1
+  },
+  "legacy_code_duplicates": 0,
+  "test_code_duplicates": 0
+}

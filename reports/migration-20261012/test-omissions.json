@@ -1,0 +1,14 @@
+{
+  "read_only": true,
+  "source_raw_base_rows": 125149,
+  "omitted_rows": 426,
+  "reason_counts": {
+    "missing_or_unusable_phone": 91,
+    "normalized_phone_absent_from_client_extract": 335
+  },
+  "kind_counts": {
+    "booking": 153,
+    "gift": 273
+  },
+  "matches_extraction_omitted_count": true
+}

@@ -1,0 +1,84 @@
+{
+  "started_at": "2026-10-12T21:16:29.173314+00:00",
+  "read_only": true,
+  "status": "INCREMENTAL_REPLAY_VERIFIED",
+  "as_of_server_time": "2026-10-10T13:32:24",
+  "purpose": "Ensayo incremental con datos reales en el último corte del clon; el incremental actual está vacío porque el clon termina el 10/10",
+  "datasets": {
+    "clientes": {
+      "rows": 43,
+      "duplicate_keys": 0,
+      "payload_sha256": "c02a8a2f8db79553e4898a75cea612f6f299f289375da8dfd73b319a71ce6e4d"
+    },
+    "base": {
+      "rows": 27,
+      "duplicate_keys": 0,
+      "payload_sha256": "4289c0bd045309dd4d2cb2aa10bd982fae2f0ce90635befc0c76f0fcca301496"
+    },
+    "flights": {
+      "rows": 0,
+      "duplicate_keys": 0,
+      "payload_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    }
+  },
+  "blockers": [],
+  "raw_counts": {
+    "incremental": {
+      "base_rows": 27,
+      "flight_rows": 0,
+      "skipped_base_rows": 0,
+      "skipped_flight_rows": 0
+    }
+  },
+  "client_source_sha256": "273ade2663b8759a4226bfb6dfa98a3fe0e62fc75d6a24919d0190dd83f596f2",
+  "reservation_source_sha256": "acfff9cd5d0d9c83a7a4e73f5dcd3731caa174d2905127018ce8d7a4a6396330",
+  "private_snapshot_path": ".local-audit/test-incremental-replay-20261012.json.gz",
+  "queries": [
+    {
+      "seconds": 0.086,
+      "rows": 1,
+      "sql_sha256": "dbb1c561e82e4749fe30f6845de2305a4f385e805e1705d32962f8d7366245e9"
+    },
+    {
+      "seconds": 0.087,
+      "rows": 1,
+      "sql_sha256": "2632a0b14100e6c837d00467964d6e02ac33864a5ef7528c84a7e5e21b252ee1"
+    },
+    {
+      "seconds": 0.181,
+      "rows": 969,
+      "sql_sha256": "affc728a19ab8222fbba2130b1450d8a38c3ecf37fc79608021dc28353d34869"
+    },
+    {
+      "seconds": 0.088,
+      "rows": 82,
+      "sql_sha256": "dab1cf581e36295987947059f9c35f61a67fdc91a826bb09afd33a4b9516e867"
+    },
+    {
+      "seconds": 3.568,
+      "rows": 287565,
+      "sql_sha256": "ae628cedaf422723d508149ffe97534434f47169b5c6b1b9cf5e886f6ece0c7a"
+    },
+    {
+      "seconds": 2.145,
+      "rows": 287565,
+      "sql_sha256": "b5cb276094ed5b57997bbc100e7c0ef8f32efd3cf41f08001af4c78edee7c3dd"
+    },
+    {
+      "seconds": 0.284,
+      "rows": 58,
+      "sql_sha256": "681651883d4ea9cb4fcee758057a53c2073c7cd85baf289685b18187f67e9325"
+    },
+    {
+      "seconds": 0.276,
+      "rows": 27,
+      "sql_sha256": "ef5bc42cdf789d9cbeee95a6e8bca503d16c7c81fa073270c42d2cf0ff10463d"
+    },
+    {
+      "seconds": 0.352,
+      "rows": 0,
+      "sql_sha256": "3050c1d9bf36179c3f0dde5dcba5713373ca33b1f9fadcd32e58a0aa61dc4d52"
+    }
+  ],
+  "finished_at": "2026-10-12T21:16:38.434445+00:00"
+}

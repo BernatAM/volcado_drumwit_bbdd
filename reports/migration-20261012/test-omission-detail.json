@@ -1,0 +1,13 @@
+{
+  "read_only": true,
+  "omitted_rows_reviewed": 426,
+  "reason_counts": {
+    "empty_or_unusable_contact_phone": 91,
+    "too_short_for_client_phone_policy": 335
+  },
+  "normalized_length_counts": {
+    "null": 91,
+    "2": 335
+  },
+  "all_omissions_explained_by_phone_policy": true
+}

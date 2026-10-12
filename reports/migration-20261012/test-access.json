@@ -1,0 +1,12 @@
+{
+  "checked_at": "2026-10-12T17:49:04.500028+00:00",
+  "environment": "test",
+  "mysql_user": "usrNubitaTEST",
+  "database": "dr5MWT2st_BD",
+  "read_only": true,
+  "server_reachable": true,
+  "server_authentication": false,
+  "complete": false,
+  "error_code": 1045,
+  "credential_note": "Se corrigió el usuario solicitado; se conserva la contraseña configurada en .env.test"
+}

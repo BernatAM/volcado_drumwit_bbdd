@@ -1,0 +1,21 @@
+{
+  "read_only": true,
+  "counts": {
+    "booking": 118622,
+    "gift": 48260,
+    "traveler": 287565,
+    "booking_contact_details": 118622,
+    "gift_contact_details": 48260,
+    "booking_flights": 92273
+  },
+  "paid_counts": [
+    {
+      "kind": "booking",
+      "n": 93919
+    },
+    {
+      "kind": "gift",
+      "n": 31230
+    }
+  ]
+}

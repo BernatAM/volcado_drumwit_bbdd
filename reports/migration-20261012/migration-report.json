@@ -1,0 +1,647 @@
+{
+  "started_at": "2026-10-12T21:24:37.171182+00:00",
+  "status": "DIFFERENCES_FOUND",
+  "legacy_git_ref": "31ebe1de772f0f0bc341c2ab310dfe93ae0410a1",
+  "read_only": true,
+  "blockers": [
+    "Diferencias en full.clientes",
+    "Diferencias en full.base",
+    "Diferencias en full.flights",
+    "Diferencias en full.clasificacion",
+    "legacy.full: skipped_base_rows = 400",
+    "legacy.full: skipped_flight_rows = 163",
+    "test.full: skipped_base_rows = 426",
+    "test.full: skipped_flight_rows = 149"
+  ],
+  "environments": {
+    "legacy": {
+      "schema": "drumwit7",
+      "info": {
+        "database_name": "dR5Mwit_Pr4dBdV3",
+        "version": "11.4.10-MariaDB-deb12",
+        "server_now": "2026-10-12T23:24:37",
+        "time_zone": "SYSTEM",
+        "tls_cipher": ""
+      },
+      "quality": {},
+      "warnings": [],
+      "client_source_sha256": "63a9c94aa70fbaee70a3eac5026736fdfb07c894d0a1137a3d61225d86523390",
+      "reservation_source_sha256": "a00aae4347f4d65d2dd32df19e7c6f9a4b89ff1bbdebcc3a4d6116fa899ffd46",
+      "raw_counts": {
+        "full": {
+          "base_rows": 104922,
+          "flight_rows": 92268,
+          "skipped_base_rows": 400,
+          "skipped_flight_rows": 163
+        },
+        "incremental": {
+          "base_rows": 27,
+          "flight_rows": 0,
+          "skipped_base_rows": 0,
+          "skipped_flight_rows": 0
+        }
+      },
+      "queries": [
+        {
+          "seconds": 0.087,
+          "rows": 1,
+          "sql_sha256": "dbb1c561e82e4749fe30f6845de2305a4f385e805e1705d32962f8d7366245e9"
+        },
+        {
+          "seconds": 0.087,
+          "rows": 1,
+          "sql_sha256": "2632a0b14100e6c837d00467964d6e02ac33864a5ef7528c84a7e5e21b252ee1"
+        },
+        {
+          "seconds": 0.179,
+          "rows": 836,
+          "sql_sha256": "affc728a19ab8222fbba2130b1450d8a38c3ecf37fc79608021dc28353d34869"
+        },
+        {
+          "seconds": 0.088,
+          "rows": 64,
+          "sql_sha256": "dab1cf581e36295987947059f9c35f61a67fdc91a826bb09afd33a4b9516e867"
+        },
+        {
+          "seconds": 3.244,
+          "rows": 326644,
+          "sql_sha256": "deb9b3576e24da34e9ee97b52c573cec80ada0b4b971a6d4510b2fe50dfb5b3f"
+        },
+        {
+          "seconds": 2.108,
+          "rows": 288907,
+          "sql_sha256": "e45ca5c083552a595cb2c040f1d0f9b43ebcd97ce571dfef2068e479364966d9"
+        },
+        {
+          "seconds": 3.034,
+          "rows": 166893,
+          "sql_sha256": "75114efafd51c2a1a4a4131e6cfc6bb44c6d846a5d55dd5a53ae5ca20ccdb32f"
+        },
+        {
+          "seconds": 0.488,
+          "rows": 58,
+          "sql_sha256": "21d23bd0ed8985c3258a4897331a95635280f2d5799255bab5087b561a0df29d"
+        },
+        {
+          "seconds": 3.137,
+          "rows": 104922,
+          "sql_sha256": "8e4d417e75bef245312bba0bfcb2bb3d8c876bafc834cfc82514afdc8b08a229"
+        },
+        {
+          "seconds": 2.945,
+          "rows": 92268,
+          "sql_sha256": "d2eb575fbb09c4e9569b06536210a7bedeb1472907b8798ac01e4d3a6c3c5737"
+        },
+        {
+          "seconds": 0.51,
+          "rows": 27,
+          "sql_sha256": "c7c7dc2d65a5280637e404bffcb8e5ab6c5d7d0a138ab05f1a91b6a7dd31a153"
+        },
+        {
+          "seconds": 0.686,
+          "rows": 0,
+          "sql_sha256": "3b7b7538b6fa916515685df8024a3eba54b9c3490032152536a1c022ef5de959"
+        }
+      ]
+    },
+    "test": {
+      "schema": "drumwit8",
+      "info": {
+        "database_name": "dr5MWT2st_BD",
+        "version": "11.4.10-MariaDB-deb12",
+        "server_now": "2026-10-12T23:24:38",
+        "time_zone": "SYSTEM",
+        "tls_cipher": ""
+      },
+      "quality": {
+        "invalid_or_duplicate_codes": 0,
+        "paid_bookings_without_contact": 0,
+        "paid_gifts_without_contact": 0,
+        "duplicate_booking_contacts": 0,
+        "duplicate_gift_contacts": 0,
+        "orphan_travelers": 0,
+        "orphan_flights": 0,
+        "invalid_traveler_types": 0,
+        "paid_bookings_with_invalid_gift": 0,
+        "paid_bookings_return_before_departure": 0,
+        "paid_bookings_without_creation_date": 0,
+        "paid_gifts_without_creation_date": 0,
+        "paid_gifts_negative_traveler_count": 0
+      },
+      "warnings": [],
+      "missing_columns": {},
+      "traveler_booking_id_index": true,
+      "client_source_sha256": "273ade2663b8759a4226bfb6dfa98a3fe0e62fc75d6a24919d0190dd83f596f2",
+      "reservation_source_sha256": "acfff9cd5d0d9c83a7a4e73f5dcd3731caa174d2905127018ce8d7a4a6396330",
+      "raw_counts": {
+        "full": {
+          "base_rows": 125149,
+          "flight_rows": 92251,
+          "skipped_base_rows": 426,
+          "skipped_flight_rows": 149
+        },
+        "incremental": {
+          "base_rows": 27,
+          "flight_rows": 0,
+          "skipped_base_rows": 0,
+          "skipped_flight_rows": 0
+        }
+      },
+      "queries": [
+        {
+          "seconds": 0.086,
+          "rows": 1,
+          "sql_sha256": "dbb1c561e82e4749fe30f6845de2305a4f385e805e1705d32962f8d7366245e9"
+        },
+        {
+          "seconds": 0.086,
+          "rows": 1,
+          "sql_sha256": "2632a0b14100e6c837d00467964d6e02ac33864a5ef7528c84a7e5e21b252ee1"
+        },
+        {
+          "seconds": 0.181,
+          "rows": 969,
+          "sql_sha256": "affc728a19ab8222fbba2130b1450d8a38c3ecf37fc79608021dc28353d34869"
+        },
+        {
+          "seconds": 0.088,
+          "rows": 82,
+          "sql_sha256": "dab1cf581e36295987947059f9c35f61a67fdc91a826bb09afd33a4b9516e867"
+        },
+        {
+          "seconds": 3.231,
+          "rows": 1,
+          "sql_sha256": "1d38f8a72c9d6e037f3a585546e4c8a95a62980665740e8d5293e2b600eb2454"
+        },
+        {
+          "seconds": 0.304,
+          "rows": 1,
+          "sql_sha256": "8b3565d1ceb80b0b792df776568de605d292a453f546f4337f3af6adc2abff60"
+        },
+        {
+          "seconds": 0.16,
+          "rows": 1,
+          "sql_sha256": "a62fa1a5da1354c18959de09dd1fe93248e51bc8ed15d00a9d43b38519c342b6"
+        },
+        {
+          "seconds": 0.126,
+          "rows": 1,
+          "sql_sha256": "7483121499118c19e822ba67e6fac0627272bb843ce958d2c2ff8cfe1d615706"
+        },
+        {
+          "seconds": 0.1,
+          "rows": 1,
+          "sql_sha256": "ad9c2f43d4c896b2c9d18ed02a144aed9c31742cb12dc5a98f32110d02cb40ce"
+        },
+        {
+          "seconds": 0.41,
+          "rows": 1,
+          "sql_sha256": "3b6b48cc6b95dedad0a92dbf8a97f732720b9fa2b33ca5074d717ce32187c4a7"
+        },
+        {
+          "seconds": 0.324,
+          "rows": 1,
+          "sql_sha256": "80311cfd2b816be121020205bd043f24b05959482621f949df4113ae546922bb"
+        },
+        {
+          "seconds": 0.204,
+          "rows": 1,
+          "sql_sha256": "3fb2ee8e89382f890c7b06aebc85a238bd2fbf43636eccc15d8019e5d4c124eb"
+        },
+        {
+          "seconds": 0.181,
+          "rows": 1,
+          "sql_sha256": "d0ed79419ea71b216cc11ff9c50491a88600c95d4b66e82bd2c6156b89543a1b"
+        },
+        {
+          "seconds": 0.128,
+          "rows": 1,
+          "sql_sha256": "1276f5191a9d4a24ee2ea35a7df73487f924ce956908938900ad50c4fba4f50c"
+        },
+        {
+          "seconds": 0.126,
+          "rows": 1,
+          "sql_sha256": "05bcdcbb0771ce889d1f86b7873a4ac1b92cce1a90486e3386a4aaf8d1a7f2f5"
+        },
+        {
+          "seconds": 0.103,
+          "rows": 1,
+          "sql_sha256": "14755cc5e07e20b8c5139ba4924335b52530da4d9287b8706aa7139b78a5634f"
+        },
+        {
+          "seconds": 0.107,
+          "rows": 1,
+          "sql_sha256": "db83bd742eb49ff19969f30e48ea60efa79c8c85401bf2a4d42a98aa8b09bf58"
+        },
+        {
+          "seconds": 0.087,
+          "rows": 2,
+          "sql_sha256": "13b8ba8c7b52bf5eb74fc6519bb4cdff5d3918c986bf5f87fc671605549e4426"
+        },
+        {
+          "seconds": 3.276,
+          "rows": 287565,
+          "sql_sha256": "ae628cedaf422723d508149ffe97534434f47169b5c6b1b9cf5e886f6ece0c7a"
+        },
+        {
+          "seconds": 1.52,
+          "rows": 287565,
+          "sql_sha256": "b5cb276094ed5b57997bbc100e7c0ef8f32efd3cf41f08001af4c78edee7c3dd"
+        },
+        {
+          "seconds": 4.877,
+          "rows": 166882,
+          "sql_sha256": "10c8f2133407a464076326c167782d5b6c0ba731e356eaabeddb1bf6ad8fca3b"
+        },
+        {
+          "seconds": 0.276,
+          "rows": 58,
+          "sql_sha256": "681651883d4ea9cb4fcee758057a53c2073c7cd85baf289685b18187f67e9325"
+        },
+        {
+          "seconds": 4.903,
+          "rows": 125149,
+          "sql_sha256": "7b159b86233c42924ac4f1025ad9df7f5ba52e11d997a8408062acee3590e89a"
+        },
+        {
+          "seconds": 2.673,
+          "rows": 92251,
+          "sql_sha256": "44d4affecbfa2345b3f3d4d08cd3a9a5810b37cfd7eb03e4b674f6d58a8545c2"
+        },
+        {
+          "seconds": 0.292,
+          "rows": 27,
+          "sql_sha256": "ef5bc42cdf789d9cbeee95a6e8bca503d16c7c81fa073270c42d2cf0ff10463d"
+        },
+        {
+          "seconds": 0.332,
+          "rows": 0,
+          "sql_sha256": "3050c1d9bf36179c3f0dde5dcba5713373ca33b1f9fadcd32e58a0aa61dc4d52"
+        }
+      ]
+    }
+  },
+  "comparisons": {
+    "full.clientes": {
+      "left_rows": 97556,
+      "right_rows": 97558,
+      "matched_rows": 95343,
+      "left_only_rows": 2213,
+      "right_only_rows": 2215,
+      "equal": false,
+      "left_sha256": "e51898ba45831a4b43821fec55cb3817cf7e5a5c8731a4756ff10996d5ffc41d",
+      "right_sha256": "3801d3c66923814d121fc07a726f375af1df7f3d7855d2d8b050a48431024ef9",
+      "left_duplicate_keys": 0,
+      "right_duplicate_keys": 0,
+      "left_missing_keys": 1788,
+      "right_missing_keys": 1790,
+      "changed_fields": {
+        "idioma": 10,
+        "nickname": 411,
+        "nombre": 418
+      }
+    },
+    "full.base": {
+      "left_rows": 104522,
+      "right_rows": 124723,
+      "matched_rows": 98606,
+      "left_only_rows": 5916,
+      "right_only_rows": 26117,
+      "equal": false,
+      "left_sha256": "a01c6bd3586a94c64c90e3c1bb286e2e3c6f5e42d67f9cac68902e62244dea18",
+      "right_sha256": "0900d992e3ac6d3c329b42432ee07adef143f836d7572697c302cc2ca884233b",
+      "left_duplicate_keys": 0,
+      "right_duplicate_keys": 0,
+      "left_missing_keys": 24,
+      "right_missing_keys": 20225,
+      "changed_fields": {
+        "cliente_id": 1052,
+        "fecha_vuelta": 2,
+        "numero_viajeros": 4877
+      }
+    },
+    "full.flights": {
+      "left_rows": 92105,
+      "right_rows": 92102,
+      "matched_rows": 91189,
+      "left_only_rows": 916,
+      "right_only_rows": 913,
+      "equal": false,
+      "left_sha256": "c8e2ecd8f5072b9fe2b8005a778cfc66fbb597b6d87cdcef29a9557978af66f9",
+      "right_sha256": "0522f836448810f8a213c8ecaaa3e16ef204b7b29442fa9875efbec8a401f1c3",
+      "left_duplicate_keys": 0,
+      "right_duplicate_keys": 0,
+      "left_missing_keys": 14,
+      "right_missing_keys": 11,
+      "changed_fields": {
+        "cliente_id": 900,
+        "fecha_vuelta": 2
+      }
+    },
+    "full.clasificacion": {
+      "left_rows": 104522,
+      "right_rows": 124723,
+      "matched_rows": 104498,
+      "left_only_rows": 24,
+      "right_only_rows": 20225,
+      "equal": false,
+      "left_sha256": "6bda73efbb31e03a69d1d5895911dd1f0ff11545084daca50015ec7118197b4a",
+      "right_sha256": "036a529f390698a546b60305c94ab7c1b1539bb6e2619930b57740d9c8d02f05",
+      "left_duplicate_keys": 0,
+      "right_duplicate_keys": 0,
+      "left_missing_keys": 24,
+      "right_missing_keys": 20225,
+      "changed_fields": {}
+    },
+    "incremental.clientes": {
+      "left_rows": 43,
+      "right_rows": 43,
+      "matched_rows": 43,
+      "left_only_rows": 0,
+      "right_only_rows": 0,
+      "equal": true,
+      "left_sha256": "c02a8a2f8db79553e4898a75cea612f6f299f289375da8dfd73b319a71ce6e4d",
+      "right_sha256": "c02a8a2f8db79553e4898a75cea612f6f299f289375da8dfd73b319a71ce6e4d",
+      "left_duplicate_keys": 0,
+      "right_duplicate_keys": 0,
+      "left_missing_keys": 0,
+      "right_missing_keys": 0,
+      "changed_fields": {}
+    },
+    "incremental.base": {
+      "left_rows": 27,
+      "right_rows": 27,
+      "matched_rows": 27,
+      "left_only_rows": 0,
+      "right_only_rows": 0,
+      "equal": true,
+      "left_sha256": "ae55a22f9789c42f6ed06236d5f66b9f61b76ef778b10f2138ac6434a6f77425",
+      "right_sha256": "ae55a22f9789c42f6ed06236d5f66b9f61b76ef778b10f2138ac6434a6f77425",
+      "left_duplicate_keys": 0,
+      "right_duplicate_keys": 0,
+      "left_missing_keys": 0,
+      "right_missing_keys": 0,
+      "changed_fields": {}
+    },
+    "incremental.flights": {
+      "left_rows": 0,
+      "right_rows": 0,
+      "matched_rows": 0,
+      "left_only_rows": 0,
+      "right_only_rows": 0,
+      "equal": true,
+      "left_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "right_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "left_duplicate_keys": 0,
+      "right_duplicate_keys": 0,
+      "left_missing_keys": 0,
+      "right_missing_keys": 0,
+      "changed_fields": {}
+    },
+    "incremental.clasificacion": {
+      "left_rows": 27,
+      "right_rows": 27,
+      "matched_rows": 27,
+      "left_only_rows": 0,
+      "right_only_rows": 0,
+      "equal": true,
+      "left_sha256": "96b5ba531ab88bd4d586c1e4dcd6f99d23fe105f5f99f78be729073068d41a93",
+      "right_sha256": "96b5ba531ab88bd4d586c1e4dcd6f99d23fe105f5f99f78be729073068d41a93",
+      "left_duplicate_keys": 0,
+      "right_duplicate_keys": 0,
+      "left_missing_keys": 0,
+      "right_missing_keys": 0,
+      "changed_fields": {}
+    }
+  },
+  "notes": [
+    "LEGACY es la referencia; TEST debe contener Drumwit8. No se comprueba la futura base PROD. Se comparan multiconjuntos de filas y duplicados.",
+    "Se fija el mismo instante para las ventanas y created_at generado; quedan excluidas las altas posteriores a ese instante.",
+    "Los cliente_id se simulan con un mapa común de teléfonos. Esta comparación no acredita el enlace real con clientes de Supabase.",
+    "En la equivalencia lógica, sólo fecha_ida, fecha_vuelta y compradora ausentes se equiparan a NULL; el payload estricto se informa aparte.",
+    "Un clon anterior al corte o escrituras concurrentes entre snapshots puede requerir un corte de negocio aprobado o repetir con la ingesta detenida.",
+    "La paridad no despliega el servicio: faltan el preflight de Supabase, la reconciliación del histórico y el ensayo de rollback.",
+    "Por petición del cliente: sólo LEGACY frente a TEST; altas del 11 y 12 de octubre excluidas. Supabase y la futura PROD quedan fuera del ensayo.",
+    "El ensayo del día completo está en legacy-vs-test/migration-report.json. Legacy contiene 37 altas posteriores a la última fecha observada en TEST el día 10, de las que 27 llegan a su payload de reservas. El ensayo común separa ese desfase. Las altas del 11 y 12 quedan fuera de ambos ensayos."
+  ],
+  "comparison_mode": "drumwit7_to_drumwit8",
+  "legacy_behavior_compared": true,
+  "as_of_server_time": "2026-10-10T13:32:24",
+  "strict_payload_comparisons": {
+    "full.base": {
+      "left_rows": 104522,
+      "right_rows": 124723,
+      "matched_rows": 22295,
+      "left_only_rows": 82227,
+      "right_only_rows": 102428,
+      "equal": false,
+      "left_sha256": "42753d8db15c50a9fb11efeb6dde365c147308784acb168bf1eb8ace74153083",
+      "right_sha256": "0900d992e3ac6d3c329b42432ee07adef143f836d7572697c302cc2ca884233b",
+      "left_duplicate_keys": 0,
+      "right_duplicate_keys": 0,
+      "left_missing_keys": 24,
+      "right_missing_keys": 20225,
+      "changed_fields": {
+        "cliente_id": 1052,
+        "fecha_vuelta": 10747,
+        "id_reserva_compradora_regalo": 81912,
+        "numero_viajeros": 4877
+      }
+    },
+    "full.flights": {
+      "left_rows": 92105,
+      "right_rows": 92102,
+      "matched_rows": 22027,
+      "left_only_rows": 70078,
+      "right_only_rows": 70075,
+      "equal": false,
+      "left_sha256": "1fb10ab72dbd58f91150ce731e5362e5b9bff31a5c923aac100a53687937698b",
+      "right_sha256": "0522f836448810f8a213c8ecaaa3e16ef204b7b29442fa9875efbec8a401f1c3",
+      "left_duplicate_keys": 0,
+      "right_duplicate_keys": 0,
+      "left_missing_keys": 14,
+      "right_missing_keys": 11,
+      "changed_fields": {
+        "cliente_id": 900,
+        "fecha_vuelta": 2,
+        "id_reserva_compradora_regalo": 69784
+      }
+    },
+    "incremental.base": {
+      "left_rows": 27,
+      "right_rows": 27,
+      "matched_rows": 14,
+      "left_only_rows": 13,
+      "right_only_rows": 13,
+      "equal": false,
+      "left_sha256": "7354ea51152d6573ff5d9986608152e36117435fe2117adb2a901b2273799bdc",
+      "right_sha256": "ae55a22f9789c42f6ed06236d5f66b9f61b76ef778b10f2138ac6434a6f77425",
+      "left_duplicate_keys": 0,
+      "right_duplicate_keys": 0,
+      "left_missing_keys": 0,
+      "right_missing_keys": 0,
+      "changed_fields": {
+        "fecha_vuelta": 7,
+        "id_reserva_compradora_regalo": 13
+      }
+    },
+    "incremental.flights": {
+      "left_rows": 0,
+      "right_rows": 0,
+      "matched_rows": 0,
+      "left_only_rows": 0,
+      "right_only_rows": 0,
+      "equal": true,
+      "left_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "right_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "left_duplicate_keys": 0,
+      "right_duplicate_keys": 0,
+      "left_missing_keys": 0,
+      "right_missing_keys": 0,
+      "changed_fields": {}
+    }
+  },
+  "scope": {
+    "reference": "legacy Drumwit7",
+    "target": "TEST Drumwit8",
+    "future_prod_included": false,
+    "supabase_included": false,
+    "requested_date_cutoff_exclusive": "2026-10-11T00:00:00",
+    "common_replay_cutoff_exclusive": "2026-10-10T13:32:24",
+    "cutoff_basis": "Último created_at/updated_at observado en TEST más un segundo; no acredita por sí solo el instante real del clonado."
+  },
+  "diagnosis_summary": [
+    "Incremental al corte común del 10/10 a las 13:32:24: 43 clientes y 27 reservas idénticos, sin duplicados ni omisiones; clasificación idéntica. Ambos lotes de vuelos incrementales están vacíos, por lo que ese ciclo no acredita vuelos nuevos.",
+    "Histórico: legacy devuelve 97.556 clientes, 104.522 reservas y 92.105 vuelos; TEST devuelve 97.558 clientes, 124.723 reservas y 92.102 vuelos. No hay claves duplicadas en los payloads comparados.",
+    "Los 104.498 códigos presentes en ambos payloads conservan su clasificación de confirmación, regalo o canje. Destinos y horas coinciden en los vuelos con código común; cambian 900 enlaces de cliente y 2 fechas de vuelta.",
+    "TEST añade 19.676 regalos que el ETL anterior excluía por fechas de viaje cero. El modelo nuevo representa los regalos sin fechas. Su inclusión puede incorporar histórico a la cola: requiere validar el alcance antes del nocturno.",
+    "Hay 536 códigos de regalo de TEST sin correspondencia en legacy, de los años 2019, 2020, 2022, 2023 y 2024. No se explican por altas del 11 o 12 de octubre.",
+    "Al corte común faltan en el payload TEST 24 códigos que devuelve legacy: 22 bookings cuyo código no está en TEST, 1 booking que pasa de estado positivo a PENDING y 1 gift omitido por enlace de teléfono. Son distintos de las 27 reservas extra posteriores al corte del día 10.",
+    "En códigos comunes cambian 1.052 teléfonos/enlaces de cliente. El nuevo código utiliza el país del contacto; legacy infería prefijos por idioma. Hay 309 cambios con prefijo extra en legacy, 161 con prefijo añadido en TEST, 363 con últimos 9 dígitos iguales y prefijo distinto y 219 cambios restantes; no se asume que sean todos correctos.",
+    "4.778 regalos con viajeros en legacy pasan a cero en TEST. El origen TEST tiene 4.780 gifts PAID con la suma de contadores a cero; el payload usa esos contadores según el modelo nuevo. Revisar la migración de los contadores.",
+    "En 99 bookings cambia numero_viajeros. En los 99, el nuevo COUNT coincide con las filas y los IDs de pasajeros vinculados en legacy: el campo antiguo num_viajeros discrepa de sus relaciones. TEST contiene detalles de viajero repetidos en 89 de estos bookings; no se ha deduplicado ni alterado el origen.",
+    "Cambian también 2 fechas de vuelta, 418 nombres, 411 nicknames y 10 idiomas para claves comunes de clientes. La extracción completa de TEST omite 426 reservas por calidad del teléfono: 91 sin teléfono utilizable y 335 con sólo dos dígitos normalizados.",
+    "Decisión: la paridad del histórico no está acreditada. Resolver los códigos ausentes y discrepancias de datos, validar los cambios esperados y repetir el ensayo antes de activar la nueva conexión o el nocturno."
+  ],
+  "difference_diagnosis": {
+    "read_only": true,
+    "new_only_causes": {
+      "gift.legacy_zero_trip_date_filter": 19676,
+      "gift.code_absent_from_legacy": 536,
+      "booking.legacy_phone_or_other_transform": 12,
+      "booking.legacy_pre1970_return_filter": 1
+    },
+    "legacy_only_causes": {
+      "booking.after_clone": 19,
+      "booking.code_absent_from_test": 22,
+      "booking.test_status_not_paid": 1,
+      "gift.test_phone_or_other_transform": 1,
+      "gift.after_clone": 8
+    },
+    "common_code_field_changes": {
+      "cliente_id": {
+        "booking": 920,
+        "gift": 132
+      },
+      "numero_viajeros": {
+        "gift": 4778,
+        "gift.different_number": 4778,
+        "booking": 99,
+        "booking.different_number": 99
+      },
+      "fecha_vuelta": {
+        "booking": 2
+      }
+    },
+    "source_status_mapping": {
+      "booking.legacy_1.test_PAID": 93224,
+      "gift.legacy_0.test_PENDING": 17028,
+      "booking.legacy_0.test_PENDING": 24687,
+      "gift.legacy_1.test_PAID": 5577,
+      "gift.legacy_3.test_PAID": 25117,
+      "booking.legacy_3.test_PAID": 695,
+      "booking.legacy_None.test_PENDING": 14,
+      "booking.legacy_1.test_PENDING": 1
+    },
+    "legacy_code_duplicates": 0,
+    "test_code_duplicates": 0
+  },
+  "field_diagnosis": {
+    "phone_change_patterns": {
+      "legacy_has_extra_prefix": 309,
+      "test_adds_prefix": 161,
+      "other_phone_change": 219,
+      "different_prefix_same_last9": 363
+    },
+    "traveler_value_changes": {
+      "gift.2->0": 4394,
+      "gift.3->0": 180,
+      "gift.5->0": 21,
+      "gift.1->0": 97,
+      "gift.4->0": 75,
+      "booking.2->4": 60,
+      "booking.4->5": 3,
+      "booking.3->6": 12,
+      "booking.4->8": 4,
+      "booking.3->4": 2,
+      "booking.1->2": 5,
+      "gift.7->0": 2,
+      "booking.2->8": 2,
+      "gift.6->0": 8,
+      "booking.6->12": 2,
+      "booking.5->10": 6,
+      "booking.4->6": 1,
+      "booking.8->16": 1,
+      "gift.8->0": 1,
+      "booking.5->6": 1
+    },
+    "return_date_changes": [
+      {
+        "legacy_departure": "2021-07-16",
+        "legacy_return": "2021-07-19",
+        "test_departure": "2021-07-16",
+        "test_return": "2021-07-18"
+      },
+      {
+        "legacy_departure": "2021-08-11",
+        "legacy_return": "2021-08-13",
+        "test_departure": "2021-08-11",
+        "test_return": "2021-08-14"
+      }
+    ],
+    "test_codes_absent_from_legacy": {
+      "gift": 536,
+      "year_2020": 414,
+      "year_2019": 117,
+      "year_2024": 1,
+      "year_2023": 2,
+      "year_2022": 2
+    },
+    "legacy_codes_absent_from_test": {
+      "before_clone": 22,
+      "after_clone": 27
+    }
+  },
+  "traveler_diagnosis": {
+    "changed_booking_count": 99,
+    "new_count_matches_legacy_relation_rows": 99,
+    "new_count_matches_legacy_distinct_passenger_ids": 99,
+    "test_contains_duplicate_traveler_details": 89,
+    "legacy_has_duplicate_passenger_relations": 0,
+    "legacy_num_viajeros_matches_distinct_details_test": 78
+  },
+  "operational_evidence": {
+    "summary": [
+      "40 pruebas locales superadas; consultas, transformaciones y validador sin conexiones de escritura.",
+      "TEST: columnas requeridas presentes, tablas requeridas InnoDB y 13 controles de integridad sin incidencias.",
+      "Dos ensayos reales de sólo lectura: hasta el día 10 inclusive y con el corte común 10/10 13:32:24.",
+      "Informes públicos con conteos y huellas; snapshots y listas de casos se conservan en .local-audit, fuera de Git."
+    ],
+    "pending_controls": [
+      "Drumwit: revisar los códigos ausentes, los contadores de regalos, teléfonos y las 2 fechas de vuelta; acordar el criterio de viajeros y los cambios esperados.",
+      "Repetir con fuentes sincronizadas y validar la nueva PROD cuando exista.",
+      "Antes de escribir en Supabase: reconciliar enlaces reales sin incluir altas fuera del corte, confirmar restricciones y ensayar idempotencia/recuperación en una copia aislada.",
+      "Antes de activar mensajes: revisar el impacto de los regalos históricos nuevos, las colas y los mensajes previstos."
+    ]
+  }
+}

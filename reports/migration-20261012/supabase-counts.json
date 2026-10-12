@@ -1,0 +1,14 @@
+{
+  "clientes": {
+    "http_status": 206,
+    "content_range": "*/120010"
+  },
+  "cliente_reservas": {
+    "http_status": 400,
+    "content_range": null
+  },
+  "opcionesinicio_client": {
+    "http_status": 206,
+    "content_range": "*/41156"
+  }
+}

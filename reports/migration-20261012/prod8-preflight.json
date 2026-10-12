@@ -1,0 +1,104 @@
+{
+  "checked_at": "2026-10-12T21:44:11.034454+00:00",
+  "read_only": true,
+  "target": "PROD",
+  "status": "AWAITING_PRODUCTION_DATA",
+  "blockers": [
+    "PROD no contiene reservas ni regalos; pendiente de cargar o confirmar el origen de datos antes de comparar y activar el ETL"
+  ],
+  "preflight": {
+    "schema": "drumwit8",
+    "info": {
+      "database_name": "dR5mW3t_8_Pr4d_BD",
+      "version": "11.4.10-MariaDB-deb12",
+      "server_now": "2026-10-12T23:44:11",
+      "time_zone": "SYSTEM",
+      "tls_cipher": ""
+    },
+    "quality": {
+      "invalid_or_duplicate_codes": 0,
+      "paid_bookings_without_contact": 0,
+      "paid_gifts_without_contact": 0,
+      "duplicate_booking_contacts": 0,
+      "duplicate_gift_contacts": 0,
+      "orphan_travelers": 0,
+      "orphan_flights": 0,
+      "invalid_traveler_types": 0,
+      "paid_bookings_with_invalid_gift": 0,
+      "paid_bookings_return_before_departure": 0,
+      "paid_bookings_without_creation_date": 0,
+      "paid_gifts_without_creation_date": 0,
+      "paid_gifts_negative_traveler_count": 0
+    },
+    "warnings": [],
+    "missing_columns": {},
+    "traveler_booking_id_index": true
+  },
+  "source_counts": [
+    {
+      "kind": "booking",
+      "total": 0,
+      "paid": null,
+      "first_created": null,
+      "last_created": null,
+      "last_updated": null
+    },
+    {
+      "kind": "gift",
+      "total": 0,
+      "paid": null,
+      "first_created": null,
+      "last_created": null,
+      "last_updated": null
+    }
+  ],
+  "traveler_count": 0,
+  "gift_paid_zero_traveler_count": 0,
+  "cross_environment_presence": {
+    "prod": {
+      "schema": "drumwit8",
+      "observed_server_time": "2026-10-12T23:45:06",
+      "tables": {
+        "booking": 0,
+        "gift": 0,
+        "traveler": 0,
+        "booking_contact_details": 0,
+        "gift_contact_details": 0,
+        "booking_flights": 0,
+        "destination": 0
+      }
+    },
+    "legacy": {
+      "schema": "drumwit7",
+      "observed_server_time": "2026-10-12T23:45:08",
+      "tables": {
+        "reserva": 167029,
+        "pasajero": 326646,
+        "pasajeros__reserva": 288909,
+        "booking_flights": 92291,
+        "destino": 140
+      }
+    },
+    "test": {
+      "schema": "drumwit8",
+      "observed_server_time": "2026-10-12T23:45:10",
+      "tables": {
+        "booking": 118622,
+        "gift": 48260,
+        "traveler": 287565
+      }
+    }
+  },
+  "configuration": {
+    "service_env_updated": true,
+    "production_reader_env": ".env.prod",
+    "test_unchanged": true,
+    "legacy_unchanged": true,
+    "processes_restarted": false,
+    "remote_writes": false,
+    "new_credentials_tracked": false,
+    "other_service_variables_preserved": true
+  },
+  "confirmed_at": "2026-10-12T21:45:11.875406+00:00",
+  "client_confirmation": "El usuario confirma que la carga de datos de PROD está pendiente."
+}

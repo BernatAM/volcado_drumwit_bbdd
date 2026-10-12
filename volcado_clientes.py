@@ -106,7 +106,7 @@ def normalize_phone(raw: Any, lang: Optional[str] = None) -> Optional[str]:
 
 def _to_camel_case_name(x: Any) -> str:
     """CamelCase por palabra (soporta guiones)."""
-    if x is None:
+    if x is None or pd.isna(x):
         return ""
     s = str(x).strip().lower()
     if not s:
@@ -123,7 +123,7 @@ def _normalize_lang(x: Any, default: str = "es") -> Optional[str]:
     Normaliza idioma a minúsculas sencillas (ej. 'es', 'en', 'pt').
     Si viene vacío/nulo, aplica default.
     """
-    if x is None:
+    if x is None or pd.isna(x):
         return default
     s = str(x).strip().lower()
     return s if s else default
@@ -202,45 +202,72 @@ def sanitize_df_for_json(df: pd.DataFrame) -> pd.DataFrame:
 # Extracciones (solo reservas y pasajeros)
 # ============================================================
 def extract_reservas(run_query, full: bool = True) -> pd.DataFrame:
-    """
-    Necesario: reserva_id, fecha_reserva, nickname, telefono, idioma, datos de regalo (incluye apellido2_comprador_regalo).
-    """
-    base = """
-    SELECT 
-        r.id AS reserva_id,
-        r.fecha_reserva,
-        r.nickname,
-        r.telefono,
-        -- Campos para regalo:
-        r.telefono_comprador_regalo,
-        r.nombre_comprador_regalo,
-        r.apellido1_comprador_regalo,
-        COALESCE(r.apellido2_comprador_regalo, NULL) AS apellido2_comprador_regalo,
-        r.idioma AS idioma
-    FROM reserva r
-    """
-    where = " WHERE r.fecha_reserva > DATE_SUB(CURDATE(), INTERVAL 1 DAY)" if not full else ""
-    return run_query(base + where)
+    """Contactos de reservas y regalos; el ID numérico sólo identifica su tabla."""
+    booking_where = " WHERE b.created_at > DATE_SUB(CURDATE(), INTERVAL 1 DAY)" if not full else ""
+    gift_where = " WHERE g.created_at > DATE_SUB(CURDATE(), INTERVAL 1 DAY)" if not full else ""
+    return run_query(f"""
+    SELECT
+        b.id AS reserva_id,
+        b.code AS codigo,
+        0 AS regalo,
+        b.created_at AS fecha_reserva,
+        bcd.nickname AS nickname,
+        CASE WHEN NULLIF(TRIM(bcd.phone_number), '') IS NOT NULL
+                  AND NULLIF(TRIM(bcd.phone_country_code), '') IS NOT NULL
+             THEN CONCAT(TRIM(bcd.phone_country_code), TRIM(bcd.phone_number)) END AS telefono,
+        NULL AS telefono_comprador_regalo,
+        NULL AS nombre_comprador_regalo,
+        NULL AS apellido1_comprador_regalo,
+        NULL AS apellido2_comprador_regalo,
+        bcd.name AS nombre_contacto,
+        NULL AS apellido1_contacto,
+        NULL AS apellido2_contacto,
+        b.language AS idioma
+    FROM booking b
+    JOIN booking_contact_details bcd ON bcd.booking_id = b.id
+    {booking_where}
+    UNION ALL
+    SELECT
+        g.id AS reserva_id,
+        g.code AS codigo,
+        1 AS regalo,
+        g.created_at AS fecha_reserva,
+        gcd.nickname AS nickname,
+        NULL AS telefono,
+        CASE WHEN NULLIF(TRIM(gcd.phone_number), '') IS NOT NULL
+                  AND NULLIF(TRIM(gcd.phone_country_code), '') IS NOT NULL
+             THEN CONCAT(TRIM(gcd.phone_country_code), TRIM(gcd.phone_number)) END AS telefono_comprador_regalo,
+        gcd.name AS nombre_comprador_regalo,
+        gcd.last_name_1 AS apellido1_comprador_regalo,
+        gcd.last_name_2 AS apellido2_comprador_regalo,
+        NULL AS nombre_contacto,
+        NULL AS apellido1_contacto,
+        NULL AS apellido2_contacto,
+        g.language AS idioma
+    FROM gift g
+    JOIN gift_contact_details gcd ON gcd.gift_id = g.id
+    {gift_where}
+    """)
 
 
 def extract_pasajero_reserva(run_query) -> pd.DataFrame:
     return run_query("""
     SELECT 
-        id_reserva AS reserva_id,
-        id_pasajero AS pasajero_id
-    FROM pasajeros__reserva
+        booking_id AS reserva_id,
+        id AS pasajero_id
+    FROM traveler
     """)
 
 
 def extract_pasajeros(run_query) -> pd.DataFrame:
     return run_query("""
     SELECT
-        id AS pasajero_id,
-        nombre,
-        apellido1 AS apellido1,
-        COALESCE(apellido2, '') AS apellido2,
-        tipo_pasajero AS tipo
-    FROM pasajero
+        t.id AS pasajero_id,
+        t.name AS nombre,
+        t.last_name_1 AS apellido1,
+        COALESCE(t.last_name_2, '') AS apellido2,
+        t.type AS tipo
+    FROM traveler t
     """)
 
 
@@ -254,20 +281,30 @@ def build_nombre_reserva_por_reserva(
     df_pasajero_reserva: pd.DataFrame,
     df_pasajeros: pd.DataFrame
 ) -> pd.DataFrame:
+    output_cols = [
+        "reserva_id", "fecha_reserva", "telefono_efectivo", "idioma",
+        "nombre_base", "apellido1_base", "apellido2_base", "nickname_puro", "nickname_display"
+    ]
+    if df_reservas.empty:
+        return pd.DataFrame(columns=output_cols)
     r = df_reservas.copy()
 
     need_cols = [
         "nickname", "telefono", "telefono_comprador_regalo",
         "nombre_comprador_regalo", "apellido1_comprador_regalo", "apellido2_comprador_regalo",
-        "fecha_reserva", "idioma"
+        "fecha_reserva", "idioma", "nombre_contacto", "apellido1_contacto", "apellido2_contacto"
     ]
     for c in need_cols:
         if c not in r.columns:
             r[c] = None
+    if "regalo" not in r.columns:
+        r["regalo"] = 0
 
     # Primer pasajero adulto
-    pr = df_pasajero_reserva.copy()
+    pr = df_pasajero_reserva.reindex(columns=["reserva_id", "pasajero_id"]).copy()
     p  = df_pasajeros.copy()
+    if p.empty:
+        p = p.reindex(columns=["pasajero_id", "nombre", "apellido1", "apellido2", "tipo"])
     if "tipo" in p.columns:
         p["__is_adult__"] = p["tipo"].apply(_is_adult)
     else:
@@ -286,26 +323,24 @@ def build_nombre_reserva_por_reserva(
         "apellido1": "pax_apellido1",
         "apellido2": "pax_apellido2"
     })
-
-    r = r.merge(first_adult, on="reserva_id", how="left")
+    # traveler.booking_id sólo referencia booking, nunca gift con el mismo ID.
+    first_adult["regalo"] = 0
+    r = r.merge(first_adult, on=["reserva_id", "regalo"], how="left")
 
     def pick_phone(row):
-        lang = row.get("idioma")                    # <- usar idioma
-        t = normalize_phone(row.get("telefono"), lang)
-        return t if t else normalize_phone(row.get("telefono_comprador_regalo"), lang)
+        # El país viene del contacto, no del idioma de la reserva.
+        if row.get("regalo") == 1:
+            return normalize_phone(row.get("telefono_comprador_regalo"))
+        return normalize_phone(row.get("telefono"))
 
     # Devuelve: nombre_base, ap1, ap2, nickname_puro (CamelCase), nickname_display (case original si venía de reserva)
     def pick_parts(row):
-        lang = row.get("idioma")                    # <- usar idioma aquí también
-        telefono_normal = normalize_phone(row.get("telefono"), lang)
-        is_gift = telefono_normal is None and normalize_phone(row.get("telefono_comprador_regalo"), lang) is not None
-
-        if is_gift:
+        if row.get("regalo") == 1:
             base_nombre  = _to_camel_case_name(row.get("nombre_comprador_regalo"))
             base_ap1     = _to_camel_case_name(row.get("apellido1_comprador_regalo"))
             base_ap2     = _to_camel_case_name(row.get("apellido2_comprador_regalo"))
 
-            nick_reserva_raw = (row.get("nickname") or "").strip()
+            nick_reserva_raw = "" if pd.isna(row.get("nickname")) else str(row.get("nickname") or "").strip()
             if nick_reserva_raw:
                 nickname_display = nick_reserva_raw  # conserva case original
                 nickname_puro    = _to_camel_case_name(nick_reserva_raw)  # guardamos en CamelCase
@@ -319,8 +354,12 @@ def build_nombre_reserva_por_reserva(
         base_nombre = _to_camel_case_name(row.get("pax_nombre"))
         base_ap1    = _to_camel_case_name(row.get("pax_apellido1"))
         base_ap2    = _to_camel_case_name(row.get("pax_apellido2"))
+        if not base_nombre:
+            base_nombre = _to_camel_case_name(row.get("nombre_contacto"))
+            base_ap1 = _to_camel_case_name(row.get("apellido1_contacto"))
+            base_ap2 = _to_camel_case_name(row.get("apellido2_contacto"))
 
-        nick_reserva_raw = (row.get("nickname") or "").strip()
+        nick_reserva_raw = "" if pd.isna(row.get("nickname")) else str(row.get("nickname") or "").strip()
         if nick_reserva_raw:
             nickname_display = nick_reserva_raw   # conserva case original
             nickname_puro    = _to_camel_case_name(nick_reserva_raw)
@@ -334,7 +373,7 @@ def build_nombre_reserva_por_reserva(
         "reserva_id","fecha_reserva","telefono","telefono_comprador_regalo",
         "nickname","pax_nombre","pax_apellido1","pax_apellido2",
         "nombre_comprador_regalo","apellido1_comprador_regalo","apellido2_comprador_regalo",
-        "idioma"
+        "idioma", "regalo", "nombre_contacto", "apellido1_contacto", "apellido2_contacto"
     ]].copy()
 
     out["telefono_efectivo"] = out.apply(pick_phone, axis=1)
@@ -351,10 +390,7 @@ def build_nombre_reserva_por_reserva(
     out["nickname_display"] = out["nickname_display"].fillna("").astype(str).str.strip()
     out["idioma"]         = out["idioma"].apply(lambda v: _normalize_lang(v, "es"))
 
-    return out[[
-        "reserva_id","fecha_reserva","telefono_efectivo","idioma",
-        "nombre_base","apellido1_base","apellido2_base","nickname_puro","nickname_display"
-    ]]
+    return out[output_cols]
 
 
 # ============================================================
@@ -455,10 +491,10 @@ def build_clientes_from_reservas(df_nombre_reserva: pd.DataFrame) -> pd.DataFram
     df = df_nombre_reserva.copy()
 
     # Teléfono y fecha
-    # usar idioma por fila al normalizar
+    # Los teléfonos efectivos ya incluyen el país del contacto.
     df["telefono"] = [
-        normalize_phone(tel, lang)                 # <- aquí usamos lang
-        for tel, lang in zip(df["telefono_efectivo"], df["idioma"])
+        normalize_phone(tel)
+        for tel in df["telefono_efectivo"]
     ]
     df = df[df["telefono"].notna()]
     df["fecha_reserva_parsed"] = pd.to_datetime(df["fecha_reserva"], errors="coerce", utc=True)
@@ -495,8 +531,7 @@ def build_clientes_from_reservas(df_nombre_reserva: pd.DataFrame) -> pd.DataFram
         "status_boarding_passes": "no_booking",
     })
 
-    # aquí también pasamos el idioma
-    out = df_dropna_phones(out, "telefono", lang_col="idioma")  # <- NUEVO parámetro lang_col
+    out = df_dropna_phones(out, "telefono")
     return out[
         ["nombre","telefono","created_at","destino","status_drumwit","status_reserva",
          "is_user_required","is_ai_mode","idioma","status_boarding_passes","nickname"]
@@ -645,7 +680,6 @@ def pipeline_upsert_nocturno(run_query_func) -> None:
 # ============================================================
 if __name__ == "__main__":
     mode = os.getenv("ETL_MODE", "nocturno").lower()  # "incremental" o "nocturno"
-    mode = "incremental"
     if mode == "incremental":
         pipeline_incremental_horario(run_query)
     elif mode == "nocturno":

@@ -1,0 +1,263 @@
+{
+  "started_at": "2026-10-12T21:11:36.878422+00:00",
+  "environment": "test",
+  "read_only": true,
+  "status": "REVIEW_REQUIRED",
+  "blockers": [
+    "full: skipped_base_rows = 426",
+    "full: skipped_flight_rows = 149",
+    "history: existing_code_linked_to_different_client = 1118",
+    "history: existing_codes_linked_to_multiple_clients = 479"
+  ],
+  "review_items": [
+    "Revisar altas nuevas e histórico ausente del preview PAID antes de importar; pueden ser diferencias de fecha del clon, cancelaciones o datos archivados."
+  ],
+  "datasets": {
+    "full.clientes": {
+      "rows": 97558,
+      "duplicate_keys": 0,
+      "missing_or_empty_keys": 0,
+      "payload_sha256": "24eb9072ab70ea473dfe8fcbfe258759fae7eb07a31b5898cba3a5ec7750e37e"
+    },
+    "full.base": {
+      "rows": 124723,
+      "duplicate_keys": 0,
+      "missing_or_empty_keys": 0,
+      "payload_sha256": "53f1252637af7d8334950c26aff4813b81848ad855c07dc134e6d0c4f089db1a"
+    },
+    "full.flights": {
+      "rows": 92102,
+      "duplicate_keys": 0,
+      "missing_or_empty_keys": 0,
+      "payload_sha256": "9f9e40596047e89d64c8e4b96dc65f820eec6bc5ec9a3f730ae9bf1e1649ab96"
+    },
+    "full.clasificacion": {
+      "rows": 124723,
+      "flow_type_counts": {
+        "confirmados": 71179,
+        "canjeo": 22587,
+        "regalo_confirmado": 30957
+      }
+    },
+    "incremental.clientes": {
+      "rows": 0,
+      "duplicate_keys": 0,
+      "missing_or_empty_keys": 0,
+      "payload_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "incremental.base": {
+      "rows": 0,
+      "duplicate_keys": 0,
+      "missing_or_empty_keys": 0,
+      "payload_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "incremental.flights": {
+      "rows": 0,
+      "duplicate_keys": 0,
+      "missing_or_empty_keys": 0,
+      "payload_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "incremental.clasificacion": {
+      "rows": 0,
+      "flow_type_counts": {}
+    }
+  },
+  "notes": [
+    "Extracción de TEST únicamente; no acredita paridad con PROD.",
+    "Se capturan payloads localmente; los cliente_id de la extracción son simulados por teléfono.",
+    "El archivo privado de extracción contiene datos personales y se guarda bajo .local-audit, excluido de Git.",
+    "La reconciliación Supabase usa GET y no dispone de snapshot común entre sus tablas."
+  ],
+  "preflight": {
+    "schema": "drumwit8",
+    "info": {
+      "database_name": "dr5MWT2st_BD",
+      "version": "11.4.10-MariaDB-deb12",
+      "server_now": "2026-10-12T23:11:37",
+      "time_zone": "SYSTEM",
+      "tls_cipher": ""
+    },
+    "quality": {
+      "invalid_or_duplicate_codes": 0,
+      "paid_bookings_without_contact": 0,
+      "paid_gifts_without_contact": 0,
+      "duplicate_booking_contacts": 0,
+      "duplicate_gift_contacts": 0,
+      "orphan_travelers": 0,
+      "orphan_flights": 0,
+      "invalid_traveler_types": 0,
+      "paid_bookings_with_invalid_gift": 0,
+      "paid_bookings_return_before_departure": 0,
+      "paid_bookings_without_creation_date": 0,
+      "paid_gifts_without_creation_date": 0,
+      "paid_gifts_negative_traveler_count": 0
+    },
+    "warnings": [],
+    "missing_columns": {},
+    "traveler_booking_id_index": true
+  },
+  "as_of_server_time": "2026-10-12T23:11:37",
+  "max_rows": 400000,
+  "client_source_sha256": "273ade2663b8759a4226bfb6dfa98a3fe0e62fc75d6a24919d0190dd83f596f2",
+  "raw_counts": {
+    "full": {
+      "base_rows": 125149,
+      "flight_rows": 92251,
+      "skipped_base_rows": 426,
+      "skipped_flight_rows": 149
+    },
+    "incremental": {
+      "base_rows": 0,
+      "flight_rows": 0,
+      "skipped_base_rows": 0,
+      "skipped_flight_rows": 0
+    }
+  },
+  "reservation_source_sha256": "acfff9cd5d0d9c83a7a4e73f5dcd3731caa174d2905127018ce8d7a4a6396330",
+  "private_snapshot_path": ".local-audit\\test-extraction-20261012T211136Z.json.gz",
+  "source_extraction_complete": true,
+  "queries": [
+    {
+      "seconds": 0.086,
+      "rows": 1,
+      "sql_sha256": "dbb1c561e82e4749fe30f6845de2305a4f385e805e1705d32962f8d7366245e9"
+    },
+    {
+      "seconds": 0.087,
+      "rows": 1,
+      "sql_sha256": "2632a0b14100e6c837d00467964d6e02ac33864a5ef7528c84a7e5e21b252ee1"
+    },
+    {
+      "seconds": 0.181,
+      "rows": 969,
+      "sql_sha256": "affc728a19ab8222fbba2130b1450d8a38c3ecf37fc79608021dc28353d34869"
+    },
+    {
+      "seconds": 0.089,
+      "rows": 82,
+      "sql_sha256": "dab1cf581e36295987947059f9c35f61a67fdc91a826bb09afd33a4b9516e867"
+    },
+    {
+      "seconds": 3.07,
+      "rows": 1,
+      "sql_sha256": "1d38f8a72c9d6e037f3a585546e4c8a95a62980665740e8d5293e2b600eb2454"
+    },
+    {
+      "seconds": 0.343,
+      "rows": 1,
+      "sql_sha256": "8b3565d1ceb80b0b792df776568de605d292a453f546f4337f3af6adc2abff60"
+    },
+    {
+      "seconds": 0.173,
+      "rows": 1,
+      "sql_sha256": "a62fa1a5da1354c18959de09dd1fe93248e51bc8ed15d00a9d43b38519c342b6"
+    },
+    {
+      "seconds": 0.123,
+      "rows": 1,
+      "sql_sha256": "7483121499118c19e822ba67e6fac0627272bb843ce958d2c2ff8cfe1d615706"
+    },
+    {
+      "seconds": 0.101,
+      "rows": 1,
+      "sql_sha256": "ad9c2f43d4c896b2c9d18ed02a144aed9c31742cb12dc5a98f32110d02cb40ce"
+    },
+    {
+      "seconds": 0.408,
+      "rows": 1,
+      "sql_sha256": "3b6b48cc6b95dedad0a92dbf8a97f732720b9fa2b33ca5074d717ce32187c4a7"
+    },
+    {
+      "seconds": 0.329,
+      "rows": 1,
+      "sql_sha256": "80311cfd2b816be121020205bd043f24b05959482621f949df4113ae546922bb"
+    },
+    {
+      "seconds": 0.214,
+      "rows": 1,
+      "sql_sha256": "3fb2ee8e89382f890c7b06aebc85a238bd2fbf43636eccc15d8019e5d4c124eb"
+    },
+    {
+      "seconds": 0.186,
+      "rows": 1,
+      "sql_sha256": "d0ed79419ea71b216cc11ff9c50491a88600c95d4b66e82bd2c6156b89543a1b"
+    },
+    {
+      "seconds": 0.128,
+      "rows": 1,
+      "sql_sha256": "1276f5191a9d4a24ee2ea35a7df73487f924ce956908938900ad50c4fba4f50c"
+    },
+    {
+      "seconds": 0.132,
+      "rows": 1,
+      "sql_sha256": "05bcdcbb0771ce889d1f86b7873a4ac1b92cce1a90486e3386a4aaf8d1a7f2f5"
+    },
+    {
+      "seconds": 0.104,
+      "rows": 1,
+      "sql_sha256": "14755cc5e07e20b8c5139ba4924335b52530da4d9287b8706aa7139b78a5634f"
+    },
+    {
+      "seconds": 0.106,
+      "rows": 1,
+      "sql_sha256": "db83bd742eb49ff19969f30e48ea60efa79c8c85401bf2a4d42a98aa8b09bf58"
+    },
+    {
+      "seconds": 0.087,
+      "rows": 2,
+      "sql_sha256": "13b8ba8c7b52bf5eb74fc6519bb4cdff5d3918c986bf5f87fc671605549e4426"
+    },
+    {
+      "seconds": 4.166,
+      "rows": 287565,
+      "sql_sha256": "ae628cedaf422723d508149ffe97534434f47169b5c6b1b9cf5e886f6ece0c7a"
+    },
+    {
+      "seconds": 1.779,
+      "rows": 287565,
+      "sql_sha256": "b5cb276094ed5b57997bbc100e7c0ef8f32efd3cf41f08001af4c78edee7c3dd"
+    },
+    {
+      "seconds": 5.115,
+      "rows": 166882,
+      "sql_sha256": "10c8f2133407a464076326c167782d5b6c0ba731e356eaabeddb1bf6ad8fca3b"
+    },
+    {
+      "seconds": 0.253,
+      "rows": 0,
+      "sql_sha256": "681651883d4ea9cb4fcee758057a53c2073c7cd85baf289685b18187f67e9325"
+    },
+    {
+      "seconds": 5.246,
+      "rows": 125149,
+      "sql_sha256": "7b159b86233c42924ac4f1025ad9df7f5ba52e11d997a8408062acee3590e89a"
+    },
+    {
+      "seconds": 2.912,
+      "rows": 92251,
+      "sql_sha256": "44d4affecbfa2345b3f3d4d08cd3a9a5810b37cfd7eb03e4b674f6d58a8545c2"
+    },
+    {
+      "seconds": 0.298,
+      "rows": 0,
+      "sql_sha256": "ef5bc42cdf789d9cbeee95a6e8bca503d16c7c81fa073270c42d2cf0ff10463d"
+    },
+    {
+      "seconds": 0.334,
+      "rows": 0,
+      "sql_sha256": "3050c1d9bf36179c3f0dde5dcba5713373ca33b1f9fadcd32e58a0aa61dc4d52"
+    }
+  ],
+  "history_reconciliation": {
+    "preview_rows": 124723,
+    "existing_exact_client_code_links": 103301,
+    "rows_without_existing_client_phone": 1429,
+    "rows_without_existing_code": 20304,
+    "existing_code_linked_to_different_client": 1118,
+    "rows_with_ambiguous_normalized_phone": 0,
+    "existing_codes_linked_to_multiple_clients": 479,
+    "existing_codes_absent_from_paid_preview": 413,
+    "queue_references_absent_from_paid_preview": 348
+  },
+  "finished_at": "2026-10-12T21:13:13.670152+00:00"
+}

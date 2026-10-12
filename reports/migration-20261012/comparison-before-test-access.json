@@ -1,0 +1,95 @@
+{
+  "started_at": "2026-10-12T16:28:18.676270+00:00",
+  "status": "INCOMPLETE",
+  "legacy_git_ref": "31ebe1de772f0f0bc341c2ab310dfe93ae0410a1",
+  "read_only": true,
+  "blockers": [
+    "prod: acceso pendiente de habilitación según el cliente; no reintentado",
+    "test: usrNubitaTEST con la contraseña local anterior devuelve 1045 de autenticación; faltan sus credenciales"
+  ],
+  "environments": {
+    "prod": {
+      "error_code": 2003,
+      "complete": false,
+      "access_pending_per_user": true
+    },
+    "test": {
+      "checked_at": "2026-10-12T17:49:04.500028+00:00",
+      "environment": "test",
+      "mysql_user": "usrNubitaTEST",
+      "database": "dr5MWT2st_BD",
+      "read_only": true,
+      "server_reachable": true,
+      "server_authentication": false,
+      "complete": false,
+      "error_code": 1045,
+      "credential_note": "Se corrigió el usuario solicitado; se conserva la contraseña configurada en .env.test"
+    }
+  },
+  "comparisons": {},
+  "notes": [
+    "PROD es la referencia; TEST debe contener Drumwit8. No basta con igualar conteos: se comparan multiconjuntos de filas y duplicados.",
+    "Se fija el mismo instante para las ventanas y created_at generado; quedan excluidas las altas posteriores a ese instante.",
+    "Los cliente_id se simulan con un mapa común de teléfonos. Esta comparación no acredita el enlace real con clientes de Supabase.",
+    "En la equivalencia lógica, sólo fecha_ida, fecha_vuelta y compradora ausentes se equiparan a NULL; el payload estricto se informa aparte.",
+    "Un clon anterior al corte o escrituras concurrentes entre snapshots puede requerir un corte de negocio aprobado o repetir con la ingesta detenida.",
+    "La paridad no despliega el servicio: faltan el preflight de Supabase, la reconciliación del histórico y el ensayo de rollback."
+  ],
+  "updated_at": "2026-10-12T17:50:07.491726+00:00",
+  "production_activation": "PENDING_VALIDATION",
+  "operational_evidence": {
+    "tests_passed": 40,
+    "test_command": "python -B -m pytest -p no:cacheprovider tests -q",
+    "supabase_history": {
+      "clientes": {
+        "rows": 120010,
+        "duplicate_client_ids": 0,
+        "without_normalizable_phone": 0,
+        "duplicate_normalized_phones": 0
+      },
+      "reservas": {
+        "rows": 105302,
+        "duplicate_conflict_keys": 0,
+        "without_identifier": 0,
+        "unknown_cliente_id": 0,
+        "gift_rows": 10800,
+        "gift_rows_with_trip_dates": 0
+      },
+      "cola": {
+        "rows": 41156,
+        "duplicate_primary_keys": 0,
+        "rows_with_reservation_reference": 41156,
+        "references_absent_from_visible_reservations": 16,
+        "active_unsent_references_absent": 0,
+        "absent_reference_flow_types": {
+          "como_ha_ido": 2,
+          "vuestra_aventura": 13,
+          "regalo_confirmado": 1
+        },
+        "flow_type_counts": {
+          "confirmados": 6287,
+          "canjeo": 5477,
+          "regalo_confirmado": 5232,
+          "como_ha_ido": 12129,
+          "vuestra_aventura": 12031
+        }
+      }
+    },
+    "summary": [
+      "Configuración local PROD actualizada y .env.test creado; credenciales preservadas, sin claves Supabase en TEST.",
+      "40 pruebas locales superadas; las pruebas bloquean la red y no usan el .env real.",
+      "Supabase: 120.010 clientes, 105.302 reservas y 41.156 mensajes leídos; cero teléfonos normalizados duplicados, claves de reserva repetidas o reservas sin cliente.",
+      "16 referencias de cola ausentes del histórico visible: ninguna está simultáneamente sin enviar y sin cancelar. Se mantiene revisión pendiente de la causa.",
+      "Hay NULL existentes en fecha_ida y fecha_vuelta, compatibles con los regalos.",
+      "Sólo se han realizado lecturas externas. No se han ejecutado ETL de escritura, cambios de esquema, planificadores ni envíos.",
+      "Cuenta TEST corregida a usrNubitaTEST. La contraseña local anterior devuelve 1045; los errores previos 1044/1142 correspondían a usrNubitaBD."
+    ],
+    "pending_controls": [
+      "Configurar las credenciales propias de usrNubitaTEST en .env.test y verificar después acceso SELECT. PROD sigue pendiente de habilitación.",
+      "Ejecutar la extracción real TEST/PROD y resolver diferencias y reconciliación de códigos/cliente_id.",
+      "Confirmar restricciones UNIQUE con el catálogo de Supabase y revisar las 16 referencias históricas ausentes.",
+      "Ensayar escritura e idempotencia en un Supabase TEST independiente; requiere su configuración.",
+      "Confirmar backups y restauración con los responsables de las bases antes de aprobar la ventana de producción."
+    ]
+  }
+}
